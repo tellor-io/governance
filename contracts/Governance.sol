@@ -31,6 +31,12 @@ contract Governance {
         uint256 slashedAmount; // amount of tokens slashed from reporter
     }
 
+    struct Tally {
+      uint256 doesSupport; // number of votes in favor
+      uint256 against; // number of votes against
+      uint256 invalidQuery; // number of votes for invalid
+    }
+
     struct Vote {
         bytes32 identifierHash; // identifier hash of the vote
         uint256 voteRound; // the round of voting on a given dispute or proposal
@@ -38,8 +44,6 @@ contract Governance {
         uint256 blockNumber; // block number of when vote was initiated
         uint256 fee; // fee associated with the vote
         uint256 tallyDate; // timestamp of when the votes were tallied
-        // uint256 doesSupport; // number of votes in favor
-        // uint256 against; // number of votes against
         Tally tokenholders;
         Tally users;
         Tally reporters;
@@ -47,7 +51,6 @@ contract Governance {
         bool executed; // boolean of is the dispute settled
         VoteResult result; // VoteResult of did the vote pass?
         bool isDispute; // boolean of is the vote a dispute as opposed to a proposal
-        // uint256 invalidQuery; // number of votes for invalid
         bytes data; // arguments used to execute a proposal
         bytes4 voteFunction; // hash of the function associated with a proposal vote
         address voteAddress; // address of contract to execute function on
@@ -55,12 +58,7 @@ contract Governance {
         mapping(address => bool) voted; // mapping of address to whether or not they voted
     }
 
-    struct Tally {
-      uint256 doesSupport;
-      uint256 against;
-      uint256 invalidQuery;
-    }
-
+    // Events
     event NewDispute(
         uint256 _disputeId,
         bytes32 _queryId,
@@ -84,7 +82,6 @@ contract Governance {
         uint256 _disputeId,
         bool _supports,
         address _voter,
-        uint256 _voteWeight,
         bool _invalidQuery
     ); // Emitted when an address casts their vote
 
@@ -95,6 +92,11 @@ contract Governance {
       teamMultisig = _teamMultisig;
     }
 
+    /**
+     * @dev Helps initialize a dispute by assigning it a disputeId
+     * @param _queryId being disputed
+     * @param _timestamp being disputed
+     */
     function beginDispute(bytes32 _queryId, uint256 _timestamp) public {
       // Ensure value actually exists
       require(
@@ -142,29 +144,29 @@ contract Governance {
       _thisVote.startDate = block.timestamp;
       _thisVote.voteRound = voteRounds[_hash].length;
       _thisVote.isDispute = true;
-    // Calculate dispute fee based on number of current vote rounds
-    uint256 _fee;
-    if (voteRounds[_hash].length == 1) {
-        _fee = disputeFee * 2**(openDisputesOnId[_queryId] - 1);
+      // Calculate dispute fee based on number of current vote rounds
+      uint256 _fee;
+      if (voteRounds[_hash].length == 1) {
+          _fee = disputeFee * 2**(openDisputesOnId[_queryId] - 1);
+          tellor.removeValue(_queryId, _timestamp);
+      } else {
+          _fee = disputeFee * 2**(voteRounds[_hash].length - 1);
+      }
+      _thisVote.fee = (_fee * 9) / 10;
+      require(
+          token.transferFrom(
+              msg.sender,
+              address(this),
+              _fee
+          ),
+          "Fee must be paid"
+      ); // This is the fork fee. Returned if dispute passes
+      if(voteRounds[_hash].length == 1) {
+        _thisDispute.slashedAmount = tellor.slashReporter(_thisDispute.disputedReporter, address(this));
         tellor.removeValue(_queryId, _timestamp);
-    } else {
-        _fee = disputeFee * 2**(voteRounds[_hash].length - 1);
-    }
-    _thisVote.fee = (_fee * 9) / 10;
-    require(
-        token.transferFrom(
-            msg.sender,
-            address(this),
-            _fee
-        ),
-        "Fee must be paid"
-    ); // This is the fork fee. Returned if dispute passes
-    if(voteRounds[_hash].length == 1) {
-      _thisDispute.slashedAmount = tellor.slashReporter(_thisDispute.disputedReporter, address(this));
-      tellor.removeValue(_queryId, _timestamp);
-      updateMinDisputeFee();
-    }
-    emit NewDispute(_disputeId, _queryId, _timestamp, _thisDispute.disputedReporter);
+        updateMinDisputeFee();
+      }
+      emit NewDispute(_disputeId, _queryId, _timestamp, _thisDispute.disputedReporter);
   }
 
   /**
@@ -260,6 +262,7 @@ contract Governance {
       }
   }
 
+
   function proposeChangeGovernanceAddress(address _newGovernanceAddress, uint256 _timestamp) external {
     _proposeVote(
       address(tellor),
@@ -271,7 +274,7 @@ contract Governance {
 
   function proposeChangeReportingLock(uint256 _newReportingLock, uint256 _timestamp) external {
     _proposeVote(
-      tellor.address,
+      address(tellor),
       bytes4(keccak256(abi.encode("changeReportingLock(uint256)"))),
       abi.encode(_newReportingLock),
       _timestamp
@@ -280,7 +283,7 @@ contract Governance {
 
   function proposeChangeStakeAmount(uint256 _newStakeAmount, uint256 _timestamp) external {
     _proposeVote(
-      tellor.address,
+      address(tellor),
       bytes4(keccak256(abi.encode("changeStakeAmount(uint256)"))),
       abi.encode(_newStakeAmount),
       _timestamp
@@ -356,7 +359,7 @@ contract Governance {
           _thisVote.isDispute
       ) {
           _thisVote.result = VoteResult.INVALID;
-      } else if (_thisVote.doesSupport > _thisVote.against) {
+      } else if (scaledDoesSupport > scaledAgainst) {
           // If there are more support votes than against votes, allow the vote to pass
           _thisVote.result = VoteResult.PASSED;
       }
@@ -458,8 +461,133 @@ contract Governance {
       emit Voted(_disputeId, _supports, msg.sender, _invalidQuery);
   }
 
+  // Getters
+  /**
+   * @dev Determines if an address voted for a specific vote
+   * @param _disputeId is the ID of the vote
+   * @param _voter is the address of the voter to check for
+   * @return bool of whether or note the address voted for the specific vote
+   */
+  function didVote(uint256 _disputeId, address _voter)
+      external
+      view
+      returns (bool)
+  {
+      return voteInfo[_disputeId].voted[_voter];
+  }
+
+  /**
+   * @dev Returns info on a dispute for a given ID
+   * @param _disputeId is the ID of a specific dispute
+   * @return bytes32 of the data ID of the dispute
+   * @return uint256 of the timestamp of the dispute
+   * @return bytes memory of the value being disputed
+   * @return address of the reporter being disputed
+   */
+  function getDisputeInfo(uint256 _disputeId)
+      external
+      view
+      returns (
+          bytes32,
+          uint256,
+          bytes memory,
+          address
+      )
+  {
+      Dispute storage _d = disputeInfo[_disputeId];
+      return (_d.queryId, _d.timestamp, _d.value, _d.disputedReporter);
+  }
+
+  /**
+   * @dev Returns the number of open disputes for a specific query ID
+   * @param _queryId is the ID of a specific data feed
+   * @return uint256 of the number of open disputes for the query ID
+   */
+  function getOpenDisputesOnId(bytes32 _queryId)
+      external
+      view
+      returns (uint256)
+  {
+      return openDisputesOnId[_queryId];
+  }
+
+  /**
+   * @dev Returns the total number of votes
+   * @return uint256 of the total number of votes
+   */
+  function getVoteCount() external view returns (uint256) {
+      return voteCount;
+  }
+
+  /**
+   * @dev Returns info on a vote for a given vote ID
+   * @param _disputeId is the ID of a specific vote
+   * @return bytes32 identifier hash of the vote
+   * @return uint256[8] memory of the pertinent round info (vote rounds, start date, fee, etc.)
+   * @return bool[2] memory of both whether or not the vote was executed and is dispute
+   * @return VoteResult result of the vote
+   * @return bytes memory of the argument data of a proposal vote
+   * @return bytes4 of the function selector proposed to be called
+   * @return address[2] memory of the Tellor system contract address and vote initiator
+   */
+  function getVoteInfo(uint256 _disputeId)
+      external
+      view
+      returns (
+          bytes32,
+          uint256[17] memory,
+          bool[2] memory,
+          VoteResult,
+          bytes memory,
+          bytes4,
+          address[2] memory
+      )
+  {
+      Vote storage _v = voteInfo[_disputeId];
+      return (
+          _v.identifierHash,
+          [
+              _v.voteRound,
+              _v.startDate,
+              _v.blockNumber,
+              _v.fee,
+              _v.tallyDate,
+              _v.tokenholders.doesSupport,
+              _v.tokenholders.against,
+              _v.tokenholders.invalidQuery,
+              _v.users.doesSupport,
+              _v.users.against,
+              _v.users.invalidQuery,
+              _v.reporters.doesSupport,
+              _v.reporters.against,
+              _v.reporters.invalidQuery,
+              _v.teamMultisig.doesSupport,
+              _v.teamMultisig.against,
+              _v.teamMultisig.invalidQuery
+          ],
+          [_v.executed, _v.isDispute],
+          _v.result,
+          _v.data,
+          _v.voteFunction,
+          [_v.voteAddress, _v.initiator]
+      );
+  }
+
+  /**
+   * @dev Returns an array of voting rounds for a given vote
+   * @param _hash is the identifier hash for a vote
+   * @return uint256[] memory dispute IDs of the vote rounds
+   */
+  function getVoteRounds(bytes32 _hash)
+      external
+      view
+      returns (uint256[] memory)
+  {
+      return voteRounds[_hash];
+  }
+
   // Internal
-  function _proposeVote(address _contract, bytes4 _function, bytes calldata _data, uint256 _timestamp) internal {
+  function _proposeVote(address _contract, bytes4 _function, bytes memory _data, uint256 _timestamp) internal {
     // Update vote count, vote ID, current vote, and timestamp
     voteCount++;
     uint256 _disputeId = voteCount;
@@ -500,7 +628,7 @@ contract Governance {
     _thisVote.voteFunction = _function;
     _thisVote.voteAddress = _contract;
     _thisVote.initiator = msg.sender;
-    emit NewVote(_function, _data, _disputeId);
+    emit NewVote(_contract, _function, _data, _disputeId);
   }
 
   function _updateUserList(address _address, bool _isUser) internal {
