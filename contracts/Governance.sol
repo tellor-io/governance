@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.3;
 
-import "./Flex.sol";
+import "./TellorFlex.sol";
 
 
 contract Governance {
