@@ -27,9 +27,12 @@ describe("Polygon Governance Function Tests", function() {
         await flex.changeGovernanceAddress(polyGov.address);
 	});
 	it("Test Constructor()", async function() {
-		assert(0==1)
+		assert(await polyGov.tellor()== flex.address, "tellor address should be correct")
+        assert(await polyGov.minimumDisputeFee() == precision, "min dispute fee should be set properly")
+        assert(await polyGov.teamMultisig() == accounts[0].address, "team multisig should be set correctly")
 	});
 
+    
 	it("Test beginDispute()", async function() {
 		assert(0==1)
 	});
