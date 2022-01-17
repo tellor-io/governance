@@ -11,7 +11,6 @@ contract Governance {
     address public teamMultisig;
     uint256 public voteCount; // total number of votes initiated
     uint256 public disputeFee; // dispute fee for a vote
-    uint256 public minimumDisputeFee;
     mapping(bytes32 => uint256[]) private voteRounds; // mapping of vote identifier hashes to an array of dispute IDs
     mapping(uint256 => Vote) private voteInfo; // mapping of vote IDs to the details of the vote
     mapping(uint256 => Dispute) private disputeInfo; // mapping of dispute IDs to the details of the dispute
@@ -85,10 +84,10 @@ contract Governance {
         bool _invalidQuery
     ); // Emitted when an address casts their vote
 
-    constructor(address _tellor, uint256 _minimumDisputeFee, address _teamMultisig) {
+    constructor(address _tellor, uint256 _disputeFee, address _teamMultisig) {
       tellor = TellorFlex(_tellor);
       token = tellor.token();
-      minimumDisputeFee = _minimumDisputeFee;
+      disputeFee = _disputeFee;
       teamMultisig = _teamMultisig;
     }
 
@@ -148,11 +147,10 @@ contract Governance {
       uint256 _fee;
       if (voteRounds[_hash].length == 1) {
           _fee = disputeFee * 2**(openDisputesOnId[_queryId] - 1);
-          tellor.removeValue(_queryId, _timestamp);
       } else {
           _fee = disputeFee * 2**(voteRounds[_hash].length - 1);
       }
-      _thisVote.fee = (_fee * 9) / 10;
+      _thisVote.fee = _fee;
       require(
           token.transferFrom(
               msg.sender,
@@ -164,7 +162,6 @@ contract Governance {
       if(voteRounds[_hash].length == 1) {
         _thisDispute.slashedAmount = tellor.slashReporter(_thisDispute.disputedReporter, address(this));
         tellor.removeValue(_queryId, _timestamp);
-        updateMinDisputeFee();
       }
       emit NewDispute(_disputeId, _queryId, _timestamp, _thisDispute.disputedReporter);
   }
@@ -374,32 +371,6 @@ contract Governance {
           _thisVote.initiator,
           disputeInfo[_disputeId].disputedReporter
       );
-  }
-
-  /**
-   * @dev This function updates the minimum dispute fee as a function of the amount
-   * of staked miners
-   */
-  function updateMinDisputeFee() public {
-    // NOTE: add these vars to governance as needed
-      // uint256 _stakeAmt = tellor.stakeAmount;
-      // uint256 _trgtMiners = IController(TELLOR_ADDRESS).uints(_TARGET_MINERS);
-      // uint256 _stakeCount = tellor.totalStakeAmount / _stakeAmt;
-      // uint256 _minFee = IController(TELLOR_ADDRESS).uints(
-      //     _MINIMUM_DISPUTE_FEE
-      // );
-      // uint256 _reducer;
-      // // Calculate total dispute fee using stake count
-      // if (_stakeCount > 0) {
-      //     _reducer =
-      //         (((_stakeAmt - _minFee) * (_stakeCount * 1000)) / _trgtMiners) /
-      //         1000;
-      // }
-      // if (_reducer >= _stakeAmt - _minFee) {
-      //     disputeFee = _minFee;
-      // } else {
-      //     disputeFee = _stakeAmt - _reducer;
-      // }
   }
 
   function vote(
