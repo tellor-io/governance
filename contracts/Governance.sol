@@ -564,14 +564,6 @@ contract Governance {
       return voteRounds[_hash];
   }
 
-  /* function getVoteTally(uint256 _disputeId) external view returns(uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256, uint256) {
-    Vote storage _v = voteInfo[_disputeId];
-    return (_v.tokenholders.doesSupport, _v.tokenholders.against, _v.tokenholders.invalidQuery,
-      _v.users.doesSupport, _v.users.against, _v.users.invalidQuery,
-      _v.reporters.doesSupport, _v.reporters.against, _v.reporters.invalidQuery,
-      _v.teamMultisig.doesSupport, _v.teamMultisig.against, _v.teamMultisig.invalidQuery);
-  } */
-
   function isUser(address _address) external view returns(bool) {
     return users[_address];
   }
