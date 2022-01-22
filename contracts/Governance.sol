@@ -2,7 +2,7 @@
 pragma solidity 0.8.3;
 
 import "./TellorFlex.sol";
-
+import "hardhat/console.sol";
 
 contract Governance {
     // Storage
@@ -96,7 +96,7 @@ contract Governance {
      * @param _queryId being disputed
      * @param _timestamp being disputed
      */
-    function beginDispute(bytes32 _queryId, uint256 _timestamp) public {
+    function beginDispute(bytes32 _queryId, uint256 _timestamp) external {
       // Ensure value actually exists
       require(
           tellor.getBlockNumberByTimestamp(_queryId, _timestamp) !=
@@ -263,7 +263,7 @@ contract Governance {
   function proposeChangeGovernanceAddress(address _newGovernanceAddress, uint256 _timestamp) external {
     _proposeVote(
       address(tellor),
-      bytes4(keccak256(abi.encode("changeGovernanceAddress(address)"))),
+      bytes4(keccak256(bytes("changeGovernanceAddress(address)"))),
       abi.encode(_newGovernanceAddress),
       _timestamp
     );
@@ -272,7 +272,7 @@ contract Governance {
   function proposeChangeReportingLock(uint256 _newReportingLock, uint256 _timestamp) external {
     _proposeVote(
       address(tellor),
-      bytes4(keccak256(abi.encode("changeReportingLock(uint256)"))),
+      bytes4(keccak256(bytes("changeReportingLock(uint256)"))),
       abi.encode(_newReportingLock),
       _timestamp
     );
@@ -281,7 +281,7 @@ contract Governance {
   function proposeChangeStakeAmount(uint256 _newStakeAmount, uint256 _timestamp) external {
     _proposeVote(
       address(tellor),
-      bytes4(keccak256(abi.encode("changeStakeAmount(uint256)"))),
+      bytes4(keccak256(bytes("changeStakeAmount(uint256)"))),
       abi.encode(_newStakeAmount),
       _timestamp
     );
@@ -290,7 +290,7 @@ contract Governance {
   function proposeUpdateUserList(address _address, bool _isUser, uint256 _timestamp) external {
     _proposeVote(
       address(this),
-      bytes4(keccak256(abi.encode("_updateUserList(address,bool)"))),
+      bytes4(keccak256(bytes("updateUserList(address,bool)"))),
       abi.encode(_address, _isUser),
       _timestamp
     );
@@ -303,8 +303,8 @@ contract Governance {
   function tallyVotes(uint256 _disputeId) external {
       // Ensure vote has not been executed and that vote has not been tallied
       Vote storage _thisVote = voteInfo[_disputeId];
-      require(!_thisVote.executed, "Dispute has been already executed");
-      require(_thisVote.tallyDate == 0, "Vote should not already be tallied");
+      require(!_thisVote.executed, "Dispute has already been executed");
+      require(_thisVote.tallyDate == 0, "Vote has already been tallied");
       require(_disputeId <= voteCount, "Vote does not exist");
       // Determine appropriate vote duration and quorum based on dispute status
       uint256 _duration = 2 days;
@@ -373,6 +373,11 @@ contract Governance {
       );
   }
 
+  function updateUserList(address _address, bool _isUser) public {
+    require(msg.sender == address(this), "Only governnace can update user list");
+    users[_address] = _isUser;
+  }
+
   function vote(
       uint256 _disputeId,
       bool _supports,
@@ -386,6 +391,8 @@ contract Governance {
       // Update voting status and increment total queries for support, invalid, or against based on vote
       _thisVote.voted[msg.sender] = true;
       uint256 voteWeight = token.balanceOf(msg.sender);
+      (,uint256 stakedBalance, uint256 lockedBalance,,) = tellor.getStakerInfo(msg.sender);
+      voteWeight += stakedBalance + lockedBalance;
       if (_thisVote.isDispute && _invalidQuery) {
           if(voteWeight > 0) {
             _thisVote.tokenholders.invalidQuery += voteWeight;
@@ -429,7 +436,7 @@ contract Governance {
             _thisVote.teamMultisig.against += 1;
           }
       }
-      emit Voted(_disputeId, _supports, msg.sender, _invalidQuery);
+      emit Voted(_disputeId, _supports, msg.sender, _invalidQuery); // represent vote weight somehow?
   }
 
   // Getters
@@ -557,6 +564,10 @@ contract Governance {
       return voteRounds[_hash];
   }
 
+  function isUser(address _address) external view returns(bool) {
+    return users[_address];
+  }
+
   // Internal
   function _proposeVote(address _contract, bytes4 _function, bytes memory _data, uint256 _timestamp) internal {
     // Update vote count, vote ID, current vote, and timestamp
@@ -600,9 +611,5 @@ contract Governance {
     _thisVote.voteAddress = _contract;
     _thisVote.initiator = msg.sender;
     emit NewVote(_contract, _function, _data, _disputeId);
-  }
-
-  function _updateUserList(address _address, bool _isUser) internal {
-    users[_address] = _isUser;
   }
 }
