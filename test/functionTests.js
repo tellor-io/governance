@@ -1,16 +1,6 @@
-const {
-  expect,
-  assert
-} = require("chai");
+const {expect,assert} = require("chai");
 const web3 = require('web3');
 const h = require("./helpers/helpers");
-const precision = BigInt(1e18);
-const REQUEST_ID_0 = ethers.utils.formatBytes32String("0");
-const REQUEST_ID_1 = ethers.utils.formatBytes32String("1");
-const FAUCET_AMOUNT = BigInt(1000) * precision;
-const TOKEN_NAME = "Testing_TRB";
-const TOKEN_SYMBOL = "tTRB";
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const QUERYID1 = h.uintTob32(1)
 
 describe("Polygon Governance Function Tests", function() {
