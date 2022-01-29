@@ -162,6 +162,8 @@ contract Governance {
       if(voteRounds[_hash].length == 1) {
         _thisDispute.slashedAmount = tellor.slashReporter(_thisDispute.disputedReporter, address(this));
         tellor.removeValue(_queryId, _timestamp);
+      } else {
+        _thisDispute.slashedAmount = disputeInfo[voteRounds[_hash][0]].slashedAmount;
       }
       emit NewDispute(_disputeId, _queryId, _timestamp, _thisDispute.disputedReporter);
   }
@@ -374,7 +376,7 @@ contract Governance {
   }
 
   function updateUserList(address _address, bool _isUser) public {
-    require(msg.sender == address(this), "Only governnace can update user list");
+    require(msg.sender == address(this), "Only governance can update user list");
     users[_address] = _isUser;
   }
 
@@ -590,7 +592,7 @@ contract Governance {
             "New dispute round must be started within a day"
         ); // 1 day for new disputes
     }
-    // Calculate fee to do anything (just 10 tokens flat, no refunds.  Goes up quickly to prevent spamming)
+    // Calculate fee to propose vote. Starts as just 10 tokens flat, doubles with each round
     uint256 _fee = 10e18 * 2**(voteRounds[_hash].length - 1);
     require(
         token.transferFrom(
