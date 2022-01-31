@@ -412,5 +412,74 @@ describe("Polygon Governance End-To-End Tests", function() {
     assert(balanceGov - await token.balanceOf(polyGov.address) == web3.utils.toWei("80"), "governance balance should decrease by original stake amount plus fee amount")
     voteInfo = await polyGov.getVoteInfo(3)
     assert(voteInfo[3] == 0, "Vote result should be correct")
-  });  
+  });
+  it("Test voting from all four stakeholder groups", async function() {
+    // define stakeholders
+    user1 = accounts[9]
+    user2 = accounts[10]
+    reporter1 = accounts[2] // reporters are also tokenholders unless completely slashed
+    reporter2 = accounts[3] // reporters are also tokenholders unless completely slashed
+    tokenholder1 = accounts[1]
+    tokenholder2 = accounts[4]
+    multisig = accounts[0]
+    // set user1
+    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
+    await polyGov.connect(accounts[1]).proposeUpdateUserList(user1.address, true, 0)
+    await polyGov.connect(accounts[1]).vote(1, true, false)
+    await h.advanceTime(86400 * 7)
+    await polyGov.connect(accounts[1]).tallyVotes(1)
+    await h.advanceTime(86400)
+    await polyGov.connect(accounts[1]).executeVote(1)
+    // set user2
+    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
+    await polyGov.connect(accounts[1]).proposeUpdateUserList(user2.address, true, 0)
+    await polyGov.connect(accounts[1]).vote(2, true, false)
+    await h.advanceTime(86400 * 7)
+    await polyGov.connect(accounts[1]).tallyVotes(2)
+    await h.advanceTime(86400)
+    await polyGov.connect(accounts[1]).executeVote(2)
+    // set tokenholder2
+    await token.connect(accounts[1]).transfer(tokenholder2.address, web3.utils.toWei("20"))
+    // submit some reporter values
+    await token.connect(accounts[1]).transfer(reporter1.address, web3.utils.toWei("10"))
+    await token.connect(accounts[1]).transfer(reporter2.address, web3.utils.toWei("10"))
+    await token.connect(reporter1).approve(flex.address, web3.utils.toWei("10"))
+    await token.connect(reporter2).approve(flex.address, web3.utils.toWei("10"))
+    await flex.connect(reporter1).depositStake(web3.utils.toWei("10"))
+    await flex.connect(reporter2).depositStake(web3.utils.toWei("10"))
+    await flex.connect(reporter1).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    blocky = await h.getBlock()
+    await flex.connect(reporter2).submitValue(h.hash('0xabcd'), h.bytes(100), 0, '0xabcd')
+    // dispute value
+    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
+    await polyGov.connect(accounts[1]).beginDispute(QUERYID1, blocky.timestamp)
+    // vote
+    await polyGov.connect(user1).vote(3, true, false)
+    await polyGov.connect(user2).vote(3, false, false)
+    await polyGov.connect(reporter1).vote(3, true, false)
+    await polyGov.connect(reporter2).vote(3, false, false)
+    await polyGov.connect(tokenholder1).vote(3, true, false)
+    await polyGov.connect(tokenholder2).vote(3, false, false)
+    await polyGov.connect(multisig).vote(3, true, false)
+    // tally and execute
+    await h.advanceTime(86400 * 2)
+    await polyGov.tallyVotes(3)
+    await h.advanceTime(86400)
+    await polyGov.executeVote(3)
+    // checks
+    voteInfo = await polyGov.getVoteInfo(3)
+    assert(voteInfo[1][5] == web3.utils.toWei("930"), "Tokenholders doesSupport should be correct")
+    assert(voteInfo[1][6] == web3.utils.toWei("30"), "Tokenholders against should be correct")
+    assert(voteInfo[1][7] == 0, "Tokenholders invalid should be correct")
+    assert(voteInfo[1][8] == 1, "Users doesSupport should be correct")
+    assert(voteInfo[1][9] == 1, "Users against should be correct")
+    assert(voteInfo[1][10] == 0, "Users invalid should be correct")
+    assert(voteInfo[1][11] == 1, "Reporters doesSupport should be correct")
+    assert(voteInfo[1][12] == 1, "Reporters against should be correct")
+    assert(voteInfo[1][13] == 0, "Reporters invalid should be correct")
+    assert(voteInfo[1][14] == 1, "Multisig doesSupport should be correct")
+    assert(voteInfo[1][15] == 0, "Multisig against should be correct")
+    assert(voteInfo[1][16] == 0, "Multisig invalid should be correct")
+    assert(voteInfo[3] == 1, "Vote result should be correct")
+  })
 })
