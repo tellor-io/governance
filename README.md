@@ -2,8 +2,6 @@
 
 ## Overview <a name="overview"> </a>
 
-<b>PolygonGovernance</b> is the main Tellor contract for the non-Ethereum chains.  The functions for the oracle contract are almost identical, but the token contracts have been abstracted away.
-
 <b>PolygonGovernance</b> is a governance contract which manages disputes and proposals for [Tellor on other EVM blockchains](https://github.com/tellor-io/tellorFlex). It shares a lot in common with mainnet Tellor, but it is more streamlined and modular.
 
 For more in-depth information about Tellor checkout our [documenation](https://docs.tellor.io/tellor/), [whitepaper](https://docs.tellor.io/tellor/whitepaper/introduction) and [website](https://tellor.io/).
