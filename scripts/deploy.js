@@ -48,11 +48,11 @@ async function deployPolygonGovernance(_network, _pk, _nodeURL, tellorAdd, dispu
         console.log("Governance contract deployed to:", "https://bscscan.com/address/" + governance.address);
         console.log("    transaction hash:", "https://bscscan.com/tx/" + governance.deployTransaction.hash);
     } else if (net == "polygon") {
-        console.log("Governance contract deployed to:", "https://explorer-mainnet.maticvigil.com/" + governance.address);
-        console.log("    transaction hash:", "https://explorer-mainnet.maticvigil.com/tx/" + governance.deployTransaction.hash);
+        console.log("Governance contract deployed to:", "https://polygonscan.com/address/" + governance.address);
+        console.log("    transaction hash:", "https://polygonscan.com/tx/" + governance.deployTransaction.hash);
     } else if (net == "polygon_testnet") {
-        console.log("Governance contract deployed to:", "https://explorer-mumbai.maticvigil.com/" + governance.address);
-        console.log("    transaction hash:", "https://explorer-mumbai.maticvigil.com/tx/" + governance.deployTransaction.hash);
+        console.log("Governance contract deployed to:", "https://mumbai.polygonscan.com/address/" + governance.address);
+        console.log("    transaction hash:", "https://mumbai.polygonscan.com/tx/" + governance.deployTransaction.hash);
     } else if (net == "arbitrum_testnet"){
         console.log("Governance contract deployed to:","https://rinkeby-explorer.arbitrum.io/#/"+ governance.address)
         console.log("    transaction hash:", "https://rinkeby-explorer.arbitrum.io/#/tx/" + governance.deployTransaction.hash);
