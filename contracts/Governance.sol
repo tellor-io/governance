@@ -3,17 +3,24 @@ pragma solidity 0.8.3;
 
 import "./TellorFlex.sol";
 
+/**
+ @author Tellor Inc.
+ @title Governance
+ @dev This is a governance contract to be used with TellorFlex. It handles disputing
+ * Tellor oracle data, proposing system parameter changes, and voting on those
+ * disputes and proposals.
+*/
 contract Governance {
     // Storage
-    TellorFlex public tellor;
-    IERC20 public token;
-    address public teamMultisig;
+    TellorFlex public tellor; // Tellor oracle contract
+    IERC20 public token; // token used for dispute fees, same as reporter staking token
+    address public teamMultisig; // address of team multisig wallet, one of four stakeholder groups
     uint256 public voteCount; // total number of votes initiated
     uint256 public disputeFee; // dispute fee for a vote
     mapping(uint256 => Dispute) private disputeInfo; // mapping of dispute IDs to the details of the dispute
     mapping(bytes32 => uint256) private openDisputesOnId; // mapping of a query ID to the number of disputes on that query ID
     mapping(address => bool) private users; // mapping of users with voting power, determined by governance proposal votes
-    mapping(uint256 => Vote) private voteInfo; // mapping of vote IDs to the details of the vote
+    mapping(uint256 => Vote) private voteInfo; // mapping of dispute IDs to the details of the vote
     mapping(bytes32 => uint256[]) private voteRounds; // mapping of vote identifier hashes to an array of dispute IDs
 
     enum VoteResult {
@@ -22,6 +29,7 @@ contract Governance {
         INVALID
     } // status of a potential vote
 
+    // Structs
     struct Dispute {
         bytes32 queryId; // query ID of disputed value
         uint256 timestamp; // timestamp of disputed value
@@ -30,7 +38,6 @@ contract Governance {
         uint256 slashedAmount; // amount of tokens slashed from reporter
     }
 
-    // Structs
     struct Tally {
         uint256 doesSupport; // number of votes in favor
         uint256 against; // number of votes against
@@ -42,15 +49,15 @@ contract Governance {
         uint256 voteRound; // the round of voting on a given dispute or proposal
         uint256 startDate; // timestamp of when vote was initiated
         uint256 blockNumber; // block number of when vote was initiated
-        uint256 fee; // fee associated with the vote
+        uint256 fee; // fee paid to initiate the vote round
         uint256 tallyDate; // timestamp of when the votes were tallied
-        Tally tokenholders;
-        Tally users;
-        Tally reporters;
-        Tally teamMultisig;
-        bool executed; // boolean of is the dispute settled
-        VoteResult result; // VoteResult of did the vote pass?
-        bool isDispute; // boolean of is the vote a dispute as opposed to a proposal
+        Tally tokenholders; // vote tally of tokenholders
+        Tally users; // vote tally of users
+        Tally reporters; // vote tally of reporters
+        Tally teamMultisig; // vote tally of teamMultisig
+        bool executed; // boolean of whether the vote was executed
+        VoteResult result; // VoteResult after votes were tallied
+        bool isDispute; // boolean of whether the vote is a dispute as opposed to a proposal
         bytes data; // arguments used to execute a proposal
         bytes4 voteFunction; // hash of the function associated with a proposal vote
         address voteAddress; // address of contract to execute function on
@@ -371,7 +378,9 @@ contract Governance {
             block.timestamp - _thisVote.startDate > _duration,
             "Time for voting has not elapsed"
         );
-
+        // Get total votes from each separate stakeholder group.  This will allow
+        // normalization so each group's votes can be combined and compared to
+        // determine the vote outcome.
         uint256 tokenVoteSum = _thisVote.tokenholders.doesSupport +
             _thisVote.tokenholders.against +
             _thisVote.tokenholders.invalidQuery;
@@ -384,6 +393,7 @@ contract Governance {
         uint256 usersVoteSum = _thisVote.users.doesSupport +
             _thisVote.users.against +
             _thisVote.users.invalidQuery;
+        // Cannot divide by zero
         if (
             tokenVoteSum * reportersVoteSum * multisigVoteSum * usersVoteSum ==
             0
@@ -401,6 +411,7 @@ contract Governance {
                 usersVoteSum++;
             }
         }
+        // Normalize and combine each stakeholder group votes
         uint256 scaledDoesSupport = ((_thisVote.tokenholders.doesSupport *
             10000) / tokenVoteSum) +
             ((_thisVote.reporters.doesSupport * 10000) / reportersVoteSum) +
@@ -416,7 +427,6 @@ contract Governance {
             ((_thisVote.reporters.invalidQuery * 10000) / reportersVoteSum) +
             ((_thisVote.teamMultisig.invalidQuery * 10000) / multisigVoteSum) +
             ((_thisVote.users.invalidQuery * 10000) / multisigVoteSum);
-
         // If there are more invalid votes than for and against, result is invalid
         if (
             scaledInvalid >= scaledDoesSupport &&
