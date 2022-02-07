@@ -169,7 +169,7 @@ contract Governance {
         require(
             token.transferFrom(msg.sender, address(this), _fee),
             "Fee must be paid"
-        ); // This is the fork fee. Returned if dispute passes
+        ); // This is the dispute fee. Returned if dispute passes
         if (voteRounds[_hash].length == 1) {
             _thisDispute.slashedAmount = tellor.slashReporter(
                 _thisDispute.disputedReporter,
@@ -218,7 +218,7 @@ contract Governance {
                 bytes memory _res;
                 (_succ, _res) = _destination.call(
                     abi.encodePacked(_thisVote.voteFunction, _thisVote.data)
-                ); // Be sure to send enough gas!
+                ); //When testing _destination.call can require higher gas than the standard. Be sure to increase the gas if it fails.
             }
             emit VoteExecuted(_disputeId, _thisVote.result);
         } else {
