@@ -50,13 +50,19 @@ require("dotenv").config();
     //      seeds: [process.env.PRIVATE_KEY],
     //      gas: 3000000 ,
     //      gasPrice: 300000000000
-    //    }
+    //    },
     // polygon_testnet: {
     //     url: `${process.env.NODE_URL_MUMBAI}`,
     //     accounts: [process.env.TESTNET_PK],
     //     gas: 10000000 ,
     //     gasPrice: 50000000000
-    //   }
+    //   },
+    // polygon: {
+      //   url: `${process.env.NODE_URL_MATIC}`,
+      //   seeds: [process.env.PRIVATE_KEY],
+      //   gas: 2000000 ,
+      //   gasPrice: 250000000000
+      // }
   },
   etherscan: {
     // Your API key for Etherscan
