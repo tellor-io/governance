@@ -366,8 +366,8 @@ describe("Polygon Governance End-To-End Tests", function() {
     await polyGov.executeVote(3)
     await h.expectThrow(polyGov.executeVote(3)) // Vote has been executed
     assert(await token.balanceOf(accounts[1].address) - balance1 == 0, "account1 balance should not change")
-    assert(await token.balanceOf(accounts[2].address) - balance2 == web3.utils.toWei("80"), "account2 balance should increase by original stake amount plus fee amount")
-    assert(balanceGov - await token.balanceOf(polyGov.address) == web3.utils.toWei("80"), "governance balance should decrease by original stake amount plus fee amount")
+    assert(await token.balanceOf(accounts[2].address) - balance2 == web3.utils.toWei("40"), "account2 balance should increase by original stake amount plus fee amount")
+    assert(balanceGov - await token.balanceOf(polyGov.address) == web3.utils.toWei("40"), "governance balance should decrease by original stake amount plus fee amount")
     voteInfo = await polyGov.getVoteInfo(3)
     assert(voteInfo[3] == 1, "Vote result should be correct")
   });
@@ -407,9 +407,9 @@ describe("Polygon Governance End-To-End Tests", function() {
     await h.expectThrow(polyGov.executeVote(2)) // Must be the final vote
     await polyGov.executeVote(3)
     await h.expectThrow(polyGov.executeVote(3)) // Vote has been executed
-    assert(await token.balanceOf(accounts[1].address) - balance1 == web3.utils.toWei("80"), "account1 balance should increase by original stake amount plus fee amount")
+    assert(await token.balanceOf(accounts[1].address) - balance1 == web3.utils.toWei("40"), "account1 balance should increase by original stake amount plus fee amount")
     assert(await token.balanceOf(accounts[2].address) - balance2 == 0, "account2 balance should not change")
-    assert(balanceGov - await token.balanceOf(polyGov.address) == web3.utils.toWei("80"), "governance balance should decrease by original stake amount plus fee amount")
+    assert(balanceGov - await token.balanceOf(polyGov.address) == web3.utils.toWei("40"), "governance balance should decrease by original stake amount plus fee amount")
     voteInfo = await polyGov.getVoteInfo(3)
     assert(voteInfo[3] == 0, "Vote result should be correct")
   });

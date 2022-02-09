@@ -165,6 +165,10 @@ contract Governance {
         } else {
             _fee = disputeFee * 2**(voteRounds[_hash].length - 1);
         }
+        if (_fee > tellor.stakeAmount()) {
+          _fee = tellor.stakeAmount();
+        }
+        _thisVote.fee = _fee;
         _thisVote.fee = _fee;
         require(
             token.transferFrom(msg.sender, address(this), _fee),
