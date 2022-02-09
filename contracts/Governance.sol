@@ -461,7 +461,7 @@ contract Governance {
      * @param _address address whose user status to update
      * @param _isUser true to set address as user, false to remove address from user list
      */
-    function updateUserList(address _address, bool _isUser) public {
+    function updateUserList(address _address, bool _isUser) external {
         require(
             msg.sender == address(this),
             "Only governance can update user list"
