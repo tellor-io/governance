@@ -9,6 +9,8 @@ const web3 = require('web3');
 
 //const dotenv = require('dotenv').config()
 //npx hardhat run scripts/deploy.js --network rinkeby
+//npx hardhat run scripts/deploy.js --network harmony_testnet
+//npx hardhat run scripts/deploy.js --network harmony_mainnet
 
 // var tellorAddress = '0x41b66dd93b03e89D29114a7613A6f9f0d4F40178'
 var tellorAddress = '0xcc12c7d111879526a63bdd59136cc969977daab2' // harmonyFlex address
@@ -95,15 +97,15 @@ async function deployPolygonGovernance(_network, _pk, _nodeURL, tellorAdd, dispu
 }
 
 
-// deployPolygonGovernance("harmony_testnet", process.env.TESTNET_PK, process.env.NODE_URL_HARMONY_TESTNET, tellorAddress, dispute_fee, teamMultisigAddress)
-//     .then(() => process.exit(0))
-//     .catch(error => {
-//         console.error(error);
-//         process.exit(1);
-//     });
-deployPolygonGovernance("harmony_mainnet", process.env.MAINNET_PK, process.env.NODE_URL_HARMONY_MAINNET, tellorAddress, dispute_fee, teamMultisigAddress)
+deployPolygonGovernance("harmony_testnet", process.env.TESTNET_PK, process.env.NODE_URL_HARMONY_TESTNET, tellorAddress, dispute_fee, teamMultisigAddress)
     .then(() => process.exit(0))
     .catch(error => {
         console.error(error);
         process.exit(1);
     });
+// deployPolygonGovernance("harmony_mainnet", process.env.MAINNET_PK, process.env.NODE_URL_HARMONY_MAINNET, tellorAddress, dispute_fee, teamMultisigAddress)
+//     .then(() => process.exit(0))
+//     .catch(error => {
+//         console.error(error);
+//         process.exit(1);
+//     });

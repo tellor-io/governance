@@ -58,23 +58,23 @@ require("dotenv").config();
     //     gasPrice: 50000000000
     //   },
     // polygon: {
-      //   url: `${process.env.NODE_URL_MATIC}`,
-      //   seeds: [process.env.PRIVATE_KEY],
-      //   gas: 2000000 ,
-      //   gasPrice: 250000000000
-      // }
-      // harmony_testnet: {
-      //   url: `${process.env.NODE_URL_HARMONY_TESTNET}`,
-      //   seeds: [process.env.PRIVATE_KEY],
+    //   url: `${process.env.NODE_URL_MATIC}`,
+    //   seeds: [process.env.PRIVATE_KEY],
+    //   gas: 2000000 ,
+    //   gasPrice: 250000000000
+    // }
+    // harmony_testnet: {
+    //   url: `${process.env.NODE_URL_HARMONY_TESTNET}`,
+    //   seeds: [process.env.PRIVATE_KEY],
+    //   gas: 4000000 ,
+    //   gasPrice: 30000000000
+    // }
+      // harmony_mainnet: {
+      //   url: `${process.env.NODE_URL_HARMONY_MAINNET}`,
+      //   seeds: [process.env.MAINNET_PK],
       //   gas: 4000000 ,
       //   gasPrice: 30000000000
       // }
-      harmony_mainnet: {
-        url: `${process.env.NODE_URL_HARMONY_MAINNET}`,
-        seeds: [process.env.MAINNET_PK],
-        gas: 4000000 ,
-        gasPrice: 30000000000
-      }
   },
   etherscan: {
     // Your API key for Etherscan
