@@ -10,8 +10,18 @@ const web3 = require('web3');
 //const dotenv = require('dotenv').config()
 //npx hardhat run scripts/deploy.js --network rinkeby
 
-var tellorAddress = '0x41b66dd93b03e89D29114a7613A6f9f0d4F40178'
-var teamMultisigAddress = '0x80fc34a2f9FfE86F41580F47368289C402DEc660'
+//Polygon or mumbai??
+//var tellorAddress = '0x41b66dd93b03e89D29114a7613A6f9f0d4F40178'
+//var teamMultisigAddress = '0x80fc34a2f9FfE86F41580F47368289C402DEc660'
+
+//Arbitrum testnet
+//var tellorAddress = '0xb32e05DF1f11B1f0E1DE2A35F4D99393EB86FF8B'
+//var teamMultisigAddress = '0x73B6715D9289bdfE5e758bB7ace782Cc7C933cfC'
+
+//Harmony mainnet
+ var tellorAddress = '0xb32e05DF1f11B1f0E1DE2A35F4D99393EB86FF8B'
+ var teamMultisigAddress = '0x73B6715D9289bdfE5e758bB7ace782Cc7C933cfC'
+
 var dispute_fee = web3.utils.toWei("10")
 
 async function deployPolygonGovernance(_network, _pk, _nodeURL, tellorAdd, disputeFee, teamMultisigAdd) {
@@ -85,10 +95,14 @@ async function deployPolygonGovernance(_network, _pk, _nodeURL, tellorAdd, dispu
 
 }
 
-
-deployPolygonGovernance("polygon_testnet", process.env.TESTNET_PK, process.env.NODE_URL_MUMBAI, tellorAddress, dispute_fee, teamMultisigAddress)
+//deployPolygonGovernance("arbitrum_testnet", process.env.PRIVATE_KEY, process.env.NODE_URL_ARBITRUM_TESTNET, tellorAddress, dispute_fee, teamMultisigAddress)
+deployPolygonGovernance("harmony_mainnet", process.env.PRIVATE_KEY, process.env.NODE_URL_HARMONY_MAINNET, tellorAddress, dispute_fee, teamMultisigAddress)
+//deployPolygonGovernance("polygon_testnet", process.env.TESTNET_PK, process.env.NODE_URL_MUMBAI, tellorAddress, dispute_fee, teamMultisigAddress)
     .then(() => process.exit(0))
     .catch(error => {
         console.error(error);
         process.exit(1);
     });
+
+
+

@@ -63,11 +63,24 @@ require("dotenv").config();
       //   gas: 2000000 ,
       //   gasPrice: 250000000000
       // }
+      , harmony_mainnet: {
+        url: "https://api.harmony.one/",
+        seeds: [process.env.PRIVATE_KEY],
+        gas: 10000000 ,
+        gasPrice: 50000000000
+    }
+    , arbitrum_testnet: {
+      url: `${process.env.NODE_URL_ARBITRUM_TESTNET}`,
+      seeds: [process.env.PRIVATE_KEY],
+      gas: 5000000 ,
+      gasPrice: 50000000000
+    }
   },
   etherscan: {
     // Your API key for Etherscan
     // Obtain one at https://etherscan.io/
-    apiKey: process.env.POLYGONSCAN
+    //apiKey: process.env.POLYGONSCAN
+    apiKey: process.env.ETHERSCAN
   },
 
   contractSizer: {
