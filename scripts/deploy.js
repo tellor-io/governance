@@ -9,6 +9,8 @@ const web3 = require('web3');
 
 //const dotenv = require('dotenv').config()
 //npx hardhat run scripts/deploy.js --network rinkeby
+//npx hardhat run scripts/deploy.js --network harmony_testnet
+//npx hardhat run scripts/deploy.js --network harmony_mainnet
 
 //Polygon or mumbai??
 //var tellorAddress = '0x41b66dd93b03e89D29114a7613A6f9f0d4F40178'
@@ -66,7 +68,10 @@ async function deployPolygonGovernance(_network, _pk, _nodeURL, tellorAdd, dispu
     } else if (net == "arbitrum_testnet"){
         console.log("Governance contract deployed to:","https://rinkeby-explorer.arbitrum.io/#/"+ governance.address)
         console.log("    transaction hash:", "https://rinkeby-explorer.arbitrum.io/#/tx/" + governance.deployTransaction.hash);
-    }  else if (net == "xdaiSokol"){ //https://blockscout.com/poa/xdai/address/
+    } else if (net == "harmony_testnet"){
+        console.log("Governance contract deployed to:","hhttps://explorer.harmony.one/address/"+ governance.address)
+        console.log("    transaction hash:", "https://explorer.harmony.one/tx/" + governance.deployTransaction.hash);
+    } else if (net == "xdaiSokol"){ //https://blockscout.com/poa/xdai/address/
       console.log("Governance contract deployed to:","https://blockscout.com/poa/sokol/address/"+ governance.address)
       console.log("    transaction hash:", "https://blockscout.com/poa/sokol/tx/" + governance.deployTransaction.hash);
     } else if (net == "xdai"){ //https://blockscout.com/poa/xdai/address/

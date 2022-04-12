@@ -74,7 +74,13 @@ require("dotenv").config();
       seeds: [process.env.PRIVATE_KEY],
       gas: 5000000 ,
       gasPrice: 50000000000
-    }
+    },
+    // harmony_testnet: {
+    //   url: `${process.env.NODE_URL_HARMONY_TESTNET}`,
+    //   seeds: [process.env.TESTNET_PK],
+    //   gas: 2000000 ,
+    //   gasPrice: 250000000000
+    // }
   },
   etherscan: {
     // Your API key for Etherscan
