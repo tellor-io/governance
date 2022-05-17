@@ -264,6 +264,8 @@ describe("Polygon Governance Function Tests", function() {
     assert(await polyGov.didVote(1, accounts[1].address), "Voter's voted status should be correct")
     assert(await polyGov.didVote(1, accounts[2].address), "Voter's voted status should be correct")
     assert(await polyGov.didVote(1, accounts[3].address) == false, "Voter's voted status should be correct")
+    assert(await polyGov.getVoteTallyByAddress(accounts[1].address) == 1, "Vote tally by address should be correct")
+    assert(await polyGov.getVoteTallyByAddress(accounts[2].address) == 1, "Vote tally by address should be correct")
   });
   it("Test didVote()", async function() {
     await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
@@ -437,4 +439,14 @@ describe("Polygon Governance Function Tests", function() {
     await polyGov.executeVote(2)
     assert(await polyGov.isUser(accounts[2].address) == false, "isUser should be correct")
   });
+  it("Test getVoteTallyByAddress()", async function() {
+    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("1000"))
+    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, true, 0)
+    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[3].address, true, 0)
+    assert(await polyGov.getVoteTallyByAddress(accounts[1].address) == 0, "Vote tally should be correct")
+    await polyGov.connect(accounts[1]).vote(1, true, false)
+    assert(await polyGov.getVoteTallyByAddress(accounts[1].address) == 1, "Vote tally should be correct")
+    await polyGov.connect(accounts[1]).vote(2, true, false)
+    assert(await polyGov.getVoteTallyByAddress(accounts[1].address) == 2, "Vote tally should be correct")
+  })
 });

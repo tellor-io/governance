@@ -22,6 +22,7 @@ contract Governance {
     mapping(address => bool) private users; // mapping of users with voting power, determined by governance proposal votes
     mapping(uint256 => Vote) private voteInfo; // mapping of dispute IDs to the details of the vote
     mapping(bytes32 => uint256[]) private voteRounds; // mapping of vote identifier hashes to an array of dispute IDs
+    mapping(address => uint256) private voteTallyByAddress; // mapping of addresses to the number of votes they have cast
 
     enum VoteResult {
         FAILED,
@@ -534,6 +535,7 @@ contract Governance {
                 _thisVote.teamMultisig.against += 1;
             }
         }
+        voteTallyByAddress[msg.sender]++;
         emit Voted(_disputeId, _supports, msg.sender, _invalidQuery);
     }
 
@@ -660,6 +662,19 @@ contract Governance {
         returns (uint256[] memory)
     {
         return voteRounds[_hash];
+    }
+
+    /**
+     * @dev Returns the total number of votes cast by an address
+     * @param _voter is the address of the voter to check for
+     * @return uint256 of the total number of votes cast by the voter
+     */
+    function getVoteTallyByAddress(address _voter)
+        external
+        view
+        returns (uint256)
+    {
+        return voteTallyByAddress[_voter];
     }
 
     /**
