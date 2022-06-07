@@ -290,24 +290,6 @@ contract Governance {
     }
 
     /**
-     * @dev Initializes proposal to change oracle governance address
-     * @param _newGovernanceAddress proposed new governance address
-     * @param _timestamp used to differentiate proposals. If set to zero, timestamp
-     * will automatically be reset to block timestamp
-     */
-    function proposeChangeGovernanceAddress(
-        address _newGovernanceAddress,
-        uint256 _timestamp
-    ) external {
-        _proposeVote(
-            address(tellor),
-            bytes4(keccak256(bytes("changeGovernanceAddress(address)"))),
-            abi.encode(_newGovernanceAddress),
-            _timestamp
-        );
-    }
-
-    /**
      * @dev Initializes proposal to change reporting lock time
      * @param _newReportingLock proposed new reporting lock time
      * @param _timestamp used to differentiate proposals. If set to zero, timestamp
