@@ -290,24 +290,6 @@ contract Governance {
     }
 
     /**
-     * @dev Initializes proposal to change reporting lock time
-     * @param _newReportingLock proposed new reporting lock time
-     * @param _timestamp used to differentiate proposals. If set to zero, timestamp
-     * will automatically be reset to block timestamp
-     */
-    function proposeChangeReportingLock(
-        uint256 _newReportingLock,
-        uint256 _timestamp
-    ) external {
-        _proposeVote(
-            address(tellor),
-            bytes4(keccak256(bytes("changeReportingLock(uint256)"))),
-            abi.encode(_newReportingLock),
-            _timestamp
-        );
-    }
-
-    /**
      * @dev Initializes proposal to change stake amount
      * @param _newStakeAmount proposed new stake amount
      * @param _timestamp used to differentiate proposals. If set to zero, timestamp

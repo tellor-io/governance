@@ -123,24 +123,6 @@ describe("Polygon Governance Function Tests", function() {
     await h.advanceTime(86400);
     await polyGov.connect(accounts[2]).executeVote(3) //must wait longer for further rounds
   });
-  it("Test proposeChangeReportingLock()", async function() {
-    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeChangeReportingLock(100, 0)
-    await polyGov.connect(accounts[1]).vote(1, true, false)
-    await h.advanceTime(86400 * 7)
-    await polyGov.connect(accounts[1]).tallyVotes(1)
-    await h.advanceTime(86400)
-    await polyGov.executeVote(1)
-    assert(await flex.reportingLock() == 100, "Reporter Lock should change")
-    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeChangeReportingLock(5000, 0)
-    await polyGov.connect(accounts[1]).vote(2, false, false)
-    await h.advanceTime(86400 * 7)
-    await polyGov.connect(accounts[1]).tallyVotes(2)
-    await h.advanceTime(86400)
-    await polyGov.executeVote(2)
-    assert(await flex.reportingLock() == 100, "Reporter Lock should not change")
-  });
   it("Test proposeChangeStakeAmount()", async function() {
     await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
     await polyGov.connect(accounts[1]).proposeChangeStakeAmount(web3.utils.toWei("100"), 0)
