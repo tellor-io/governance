@@ -290,24 +290,6 @@ contract Governance {
     }
 
     /**
-     * @dev Initializes proposal to change stake amount
-     * @param _newStakeAmount proposed new stake amount
-     * @param _timestamp used to differentiate proposals. If set to zero, timestamp
-     * will automatically be reset to block timestamp
-     */
-    function proposeChangeStakeAmount(
-        uint256 _newStakeAmount,
-        uint256 _timestamp
-    ) external {
-        _proposeVote(
-            address(tellor),
-            bytes4(keccak256(bytes("changeStakeAmount(uint256)"))),
-            abi.encode(_newStakeAmount),
-            _timestamp
-        );
-    }
-
-    /**
      * @dev Initializes proposal to update user stakeholder list
      * @param _address address whose user status to update
      * @param _isUser true to set address as user, false to remove address from user list
