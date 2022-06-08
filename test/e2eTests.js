@@ -2,13 +2,18 @@ const {
   expect,
   assert
 } = require("chai");
+const { ethers } = require("hardhat");
 const web3 = require('web3');
 const h = require("./helpers/helpers");
 const QUERYID1 = h.uintTob32(1)
+const abiCoder = new ethers.utils.AbiCoder
+const autopayQueryData = abiCoder.encode(["string", "bytes"], ["AutopayAddresses", abiCoder.encode(['bytes'], ['0x'])])
+const autopayQueryId = ethers.utils.keccak256(autopayQueryData)
+
 
 describe("Polygon Governance End-To-End Tests", function() {
 
-  let polyGov, flex, accounts, token;
+  let polyGov, flex, accounts, token, autopay, autopayArray;
 
   beforeEach(async function() {
     accounts = await ethers.getSigners();
@@ -21,8 +26,11 @@ describe("Polygon Governance End-To-End Tests", function() {
     await flex.deployed();
     polyGov = await PolygonGovernance.deploy(flex.address, web3.utils.toWei("10"), accounts[0].address);
     await polyGov.deployed();
+    const Autopay = await ethers.getContractFactory("AutopayMock");
+    autopay = await Autopay.deploy(token.address);
     await flex.changeGovernanceAddress(polyGov.address);
     await token.mint(accounts[1].address, web3.utils.toWei("1000"));
+    autopayArray = abiCoder.encode(["address[]"], [[autopay.address]]);
   });
   it("Test multiple disputes", async function() {
     await token.connect(accounts[1]).approve(flex.address, web3.utils.toWei("1000"))
@@ -196,6 +204,12 @@ describe("Polygon Governance End-To-End Tests", function() {
     assert(voteInfo[3] == 0, "Vote result should be correct")
   });
   it("Test voting from all four stakeholder groups", async function() {
+    // submit autopay addresses array to oracle
+    await token.mint(accounts[19].address, web3.utils.toWei("10"))
+    await token.connect(accounts[19]).approve(flex.address, web3.utils.toWei("10"))
+    await flex.connect(accounts[19]).depositStake(web3.utils.toWei("10"))
+    await flex.connect(accounts[19]).submitValue(autopayQueryId, autopayArray, 0, autopayQueryData)
+    await h.advanceTime(86400)
     // define stakeholders
     user1 = accounts[9]
     user2 = accounts[10]
@@ -205,21 +219,13 @@ describe("Polygon Governance End-To-End Tests", function() {
     tokenholder2 = accounts[4]
     multisig = accounts[0]
     // set user1
-    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(user1.address, true, 0)
-    await polyGov.connect(accounts[1]).vote(1, true, false)
-    await h.advanceTime(86400 * 7)
-    await polyGov.connect(accounts[1]).tallyVotes(1)
-    await h.advanceTime(86400)
-    await polyGov.connect(accounts[1]).executeVote(1)
-    // set user2
-    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(user2.address, true, 0)
-    await polyGov.connect(accounts[1]).vote(2, true, false)
-    await h.advanceTime(86400 * 7)
-    await polyGov.connect(accounts[1]).tallyVotes(2)
-    await h.advanceTime(86400)
-    await polyGov.connect(accounts[1]).executeVote(2)
+    await token.mint(user1.address, web3.utils.toWei("1"))
+    await token.connect(user1).approve(autopay.address, web3.utils.toWei("1"))
+    await autopay.connect(user1).tip(QUERYID1, web3.utils.toWei("1"), '0x')
+    // // set user2
+    await token.mint(user2.address, web3.utils.toWei("1"))
+    await token.connect(user2).approve(autopay.address, web3.utils.toWei("1"))
+    await autopay.connect(user2).tip(QUERYID1, web3.utils.toWei("1"), '0x')
     // set tokenholder2
     await token.connect(accounts[1]).transfer(tokenholder2.address, web3.utils.toWei("20"))
     // submit some reporter values
@@ -236,25 +242,25 @@ describe("Polygon Governance End-To-End Tests", function() {
     await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
     await polyGov.connect(accounts[1]).beginDispute(QUERYID1, blocky.timestamp)
     // vote
-    await polyGov.connect(user1).vote(3, true, false)
-    await polyGov.connect(user2).vote(3, false, false)
-    await polyGov.connect(reporter1).vote(3, true, false)
-    await polyGov.connect(reporter2).vote(3, false, false)
-    await polyGov.connect(tokenholder1).vote(3, true, false)
-    await polyGov.connect(tokenholder2).vote(3, false, false)
-    await polyGov.connect(multisig).vote(3, true, false)
+    await polyGov.connect(user1).vote(1, true, false)
+    await polyGov.connect(user2).vote(1, false, false)
+    await polyGov.connect(reporter1).vote(1, true, false)
+    await polyGov.connect(reporter2).vote(1, false, false)
+    await polyGov.connect(tokenholder1).vote(1, true, false)
+    await polyGov.connect(tokenholder2).vote(1, false, false)
+    await polyGov.connect(multisig).vote(1, true, false)
     // tally and execute
     await h.advanceTime(86400 * 2)
-    await polyGov.tallyVotes(3)
+    await polyGov.tallyVotes(1)
     await h.advanceTime(86400)
-    await polyGov.executeVote(3)
+    await polyGov.executeVote(1)
     // checks
-    voteInfo = await polyGov.getVoteInfo(3)
-    assert(voteInfo[1][5] == web3.utils.toWei("930"), "Tokenholders doesSupport should be correct")
+    voteInfo = await polyGov.getVoteInfo(1)
+    assert(voteInfo[1][5] == web3.utils.toWei("950"), "Tokenholders doesSupport should be correct")
     assert(voteInfo[1][6] == web3.utils.toWei("30"), "Tokenholders against should be correct")
     assert(voteInfo[1][7] == 0, "Tokenholders invalid should be correct")
-    assert(voteInfo[1][8] == 1, "Users doesSupport should be correct")
-    assert(voteInfo[1][9] == 1, "Users against should be correct")
+    assert(voteInfo[1][8] == web3.utils.toWei("1"), "Users doesSupport should be correct")
+    assert(voteInfo[1][9] == web3.utils.toWei("1"), "Users against should be correct")
     assert(voteInfo[1][10] == 0, "Users invalid should be correct")
     assert(voteInfo[1][11] == 1, "Reporters doesSupport should be correct")
     assert(voteInfo[1][12] == 1, "Reporters against should be correct")
