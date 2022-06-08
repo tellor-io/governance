@@ -22,7 +22,6 @@ contract Governance is UsingTellor {
     bytes32 public autopayAddrsQueryId = keccak256(abi.encode("AutopayAddresses", abi.encode(bytes('')))); // query id for autopay addresses array
     mapping(uint256 => Dispute) private disputeInfo; // mapping of dispute IDs to the details of the dispute
     mapping(bytes32 => uint256) private openDisputesOnId; // mapping of a query ID to the number of disputes on that query ID
-    mapping(address => bool) private users; // mapping of users with voting power, determined by governance proposal votes
     mapping(uint256 => Vote) private voteInfo; // mapping of dispute IDs to the details of the vote
     mapping(bytes32 => uint256[]) private voteRounds; // mapping of vote identifier hashes to an array of dispute IDs
     mapping(address => uint256) private voteTallyByAddress; // mapping of addresses to the number of votes they have cast
@@ -293,26 +292,6 @@ contract Governance is UsingTellor {
     }
 
     /**
-     * @dev Initializes proposal to update user stakeholder list
-     * @param _address address whose user status to update
-     * @param _isUser true to set address as user, false to remove address from user list
-     * @param _timestamp used to differentiate proposals. If set to zero, timestamp
-     * will automatically be reset to block timestamp
-     */
-    function proposeUpdateUserList(
-        address _address,
-        bool _isUser,
-        uint256 _timestamp
-    ) external {
-        _proposeVote(
-            address(this),
-            bytes4(keccak256(bytes("updateUserList(address,bool)"))),
-            abi.encode(_address, _isUser),
-            _timestamp
-        );
-    }
-
-    /**
      * @dev Tallies the votes and begins the 1 day challenge period
      * @param _disputeId is the dispute id
      */
@@ -399,20 +378,6 @@ contract Governance is UsingTellor {
             _thisVote.initiator,
             disputeInfo[_disputeId].disputedReporter
         );
-    }
-
-    /**
-     * @dev Changes address's status as user. Can only be called by this contract
-     * through a proposeUpdateUserList proposal
-     * @param _address address whose user status to update
-     * @param _isUser true to set address as user, false to remove address from user list
-     */
-    function updateUserList(address _address, bool _isUser) external {
-        require(
-            msg.sender == address(this),
-            "Only governance can update user list"
-        );
-        users[_address] = _isUser;
     }
 
     /**
@@ -601,16 +566,6 @@ contract Governance is UsingTellor {
         return voteTallyByAddress[_voter];
     }
 
-    /**
-     * @dev Returns boolean value for whether a given address is set as a user with
-     * voting rights
-     * @param _address address of potential user
-     * @return bool whether or not the address is set as a user
-     */
-    function isUser(address _address) external view returns (bool) {
-        return users[_address];
-    }
-
     // Internal
     /**
      * @dev Retrieves total tips contributed to autopay by a given address
@@ -636,56 +591,5 @@ contract Governance is UsingTellor {
         } else {
             return 0;
         }
-    }
-    /**
-     * @dev Proposes a vote for an associated Tellor contract and function, and defines the properties of the vote
-     * @param _contract is the Tellor contract to propose a vote for -> used to calculate identifier hash
-     * @param _function is the Tellor function to propose a vote for -> used to calculate identifier hash
-     * @param _data is the function argument data associated with the vote proposal -> used to calculate identifier hash
-     * @param _timestamp is the timestamp associated with the vote -> used to calculate identifier hash
-     */
-    function _proposeVote(
-        address _contract,
-        bytes4 _function,
-        bytes memory _data,
-        uint256 _timestamp
-    ) internal {
-        // Update vote count, vote ID, current vote, and timestamp
-        voteCount++;
-        uint256 _disputeId = voteCount;
-        Vote storage _thisVote = voteInfo[_disputeId];
-        if (_timestamp == 0) {
-            _timestamp = block.timestamp;
-        }
-        // Calculate vote identifier hash and push to vote rounds
-        bytes32 _hash = keccak256(
-            abi.encodePacked(_contract, _function, _data, _timestamp)
-        );
-        voteRounds[_hash].push(_disputeId);
-        // Ensure new dispute round started within a day
-        if (voteRounds[_hash].length > 1) {
-            uint256 _prevId = voteRounds[_hash][voteRounds[_hash].length - 2];
-            require(
-                block.timestamp - voteInfo[_prevId].tallyDate < 1 days,
-                "New dispute round must be started within a day"
-            ); // 1 day for new disputes
-        }
-        // Calculate fee to propose vote. Starts as just 10 tokens flat, doubles with each round
-        uint256 _fee = 10e18 * 2**(voteRounds[_hash].length - 1);
-        require(
-            token.transferFrom(msg.sender, address(this), _fee),
-            "Fee must be paid"
-        );
-        // Update information on vote -- hash, vote round, start date, block number, fee, etc.
-        _thisVote.identifierHash = _hash;
-        _thisVote.voteRound = voteRounds[_hash].length;
-        _thisVote.startDate = block.timestamp;
-        _thisVote.blockNumber = block.number;
-        _thisVote.fee = _fee;
-        _thisVote.data = _data;
-        _thisVote.voteFunction = _function;
-        _thisVote.voteAddress = _contract;
-        _thisVote.initiator = msg.sender;
-        emit NewVote(_contract, _function, _data, _disputeId);
     }
 }

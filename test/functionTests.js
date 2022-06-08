@@ -2,10 +2,13 @@ const {expect,assert} = require("chai");
 const web3 = require('web3');
 const h = require("./helpers/helpers");
 const QUERYID1 = h.uintTob32(1)
+const abiCoder = new ethers.utils.AbiCoder
+const autopayQueryData = abiCoder.encode(["string", "bytes"], ["AutopayAddresses", abiCoder.encode(['bytes'], ['0x'])])
+const autopayQueryId = ethers.utils.keccak256(autopayQueryData)
 
 describe("Polygon Governance Function Tests", function() {
 
-  let polyGov, flex, accounts, token;
+  let polyGov, flex, accounts, token, autopay, autopayArray;
 
   beforeEach(async function() {
     accounts = await ethers.getSigners();
@@ -18,8 +21,11 @@ describe("Polygon Governance Function Tests", function() {
     await flex.deployed();
     polyGov = await PolygonGovernance.deploy(flex.address, web3.utils.toWei("10"), accounts[0].address);
     await polyGov.deployed();
+    const Autopay = await ethers.getContractFactory("AutopayMock");
+    autopay = await Autopay.deploy(token.address);
     await flex.changeGovernanceAddress(polyGov.address);
     await token.mint(accounts[1].address, web3.utils.toWei("1000"));
+    autopayArray = abiCoder.encode(["address[]"], [[autopay.address]]);
   });
   it("Test Constructor()", async function() {
     assert(await polyGov.tellor() == flex.address, "tellor address should be correct")
@@ -123,42 +129,7 @@ describe("Polygon Governance Function Tests", function() {
     await h.advanceTime(86400);
     await polyGov.connect(accounts[2]).executeVote(3) //must wait longer for further rounds
   });
-  it("Test proposeUpdateUserList()", async function() {
-    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, true, 0)
-    await polyGov.connect(accounts[1]).vote(1, true, false)
-    await h.advanceTime(86400 * 7)
-    await polyGov.connect(accounts[1]).tallyVotes(1)
-    await h.advanceTime(86400)
-    await polyGov.executeVote(1)
-    assert(await polyGov.isUser(accounts[2].address), "User list should change")
-    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[3].address, true, 0)
-    await polyGov.connect(accounts[1]).vote(2, false, false)
-    await h.advanceTime(86400 * 7)
-    await polyGov.connect(accounts[1]).tallyVotes(2)
-    await h.advanceTime(86400)
-    await polyGov.executeVote(2)
-    assert(await polyGov.isUser(accounts[3].address) == false, "User list should change")
-  });
   it("Test tallyVotes()", async function() {
-    // Test tallyVotes on proposal
-    await h.expectThrow(polyGov.connect(accounts[1]).tallyVotes(1)) // Vote does not exist
-    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, true, 0)
-    await polyGov.connect(accounts[1]).vote(1, true, false)
-    await h.expectThrow(polyGov.connect(accounts[1]).tallyVotes(1)) // Time for voting has not elapsed
-    await h.advanceTime(86400 * 7)
-    await polyGov.connect(accounts[1]).tallyVotes(1)
-    blocky = await h.getBlock()
-    await h.expectThrow(polyGov.connect(accounts[1]).tallyVotes(1)) // Vote should not already be tallied
-    await h.advanceTime(86400)
-    voteInfo = await polyGov.getVoteInfo(1)
-    assert(voteInfo[3] == 1, "Vote result should change")
-    assert(voteInfo[1][4] == blocky.timestamp, "Tally date should be correct")
-    await polyGov.executeVote(1)
-    await h.expectThrow(polyGov.connect(accounts[1]).tallyVotes(1)) // Dispute has been already executed
-
     // Test tallyVotes on dispute
     await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("20"))
     await token.connect(accounts[2]).approve(flex.address, web3.utils.toWei("20"))
@@ -167,17 +138,17 @@ describe("Polygon Governance Function Tests", function() {
     blocky = await h.getBlock()
     await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
     await polyGov.connect(accounts[1]).beginDispute(h.uintTob32(1), blocky.timestamp)
-    await polyGov.connect(accounts[1]).vote(2, true, false)
-    await h.expectThrow(polyGov.connect(accounts[1]).tallyVotes(2)) // Time for voting has not elapsed
+    await polyGov.connect(accounts[1]).vote(1, true, false)
+    await h.expectThrow(polyGov.connect(accounts[1]).tallyVotes(1)) // Time for voting has not elapsed
     await h.advanceTime(86400 * 2)
-    await polyGov.connect(accounts[1]).tallyVotes(2)
+    await polyGov.connect(accounts[1]).tallyVotes(1)
     blocky = await h.getBlock()
     await h.advanceTime(86400)
-    voteInfo = await polyGov.getVoteInfo(2)
+    voteInfo = await polyGov.getVoteInfo(1)
     assert(voteInfo[3] == 1, "Vote result should change")
     assert(voteInfo[1][4] == blocky.timestamp, "Tally date should be correct")
-    await polyGov.executeVote(2)
-    await h.expectThrow(polyGov.connect(accounts[1]).tallyVotes(2)) // Dispute has been already executed
+    await polyGov.executeVote(1)
+    await h.expectThrow(polyGov.connect(accounts[1]).tallyVotes(1)) // Dispute has been already executed
   });
   it("Test vote()", async function() {
     await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("20"))
@@ -214,8 +185,13 @@ describe("Polygon Governance Function Tests", function() {
     assert(await polyGov.getVoteTallyByAddress(accounts[2].address) == 1, "Vote tally by address should be correct")
   });
   it("Test didVote()", async function() {
+    await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("20"))
+    await token.connect(accounts[2]).approve(flex.address, web3.utils.toWei("20"))
+    await flex.connect(accounts[2]).depositStake(web3.utils.toWei("20"))
+    await flex.connect(accounts[2]).submitValue(h.uintTob32(1), h.uintTob32(100), 0, '0x')
+    blocky = await h.getBlock()
     await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, true, 0)
+    await polyGov.connect(accounts[1]).beginDispute(h.uintTob32(1), blocky.timestamp)
     assert(await polyGov.didVote(1, accounts[1].address) == false, "Voter's voted status should be correct")
     await polyGov.connect(accounts[1]).vote(1, true, false)
     assert(await polyGov.didVote(1, accounts[1].address), "Voter's voted status should be correct")
@@ -266,14 +242,24 @@ describe("Polygon Governance Function Tests", function() {
     await h.advanceTime(86400)
     await polyGov.executeVote(1)
     assert(await polyGov.getVoteCount() == 1, "Vote count should not change after vote execution")
+    await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("20"))
+    await token.connect(accounts[2]).approve(flex.address, web3.utils.toWei("20"))
+    await flex.connect(accounts[2]).depositStake(web3.utils.toWei("20"))
+    await flex.connect(accounts[2]).submitValue(h.uintTob32(1), h.uintTob32(100), 0, '0x')
+    blocky = await h.getBlock()
     await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, true, 0)
+    await polyGov.connect(accounts[1]).beginDispute(h.uintTob32(1), blocky.timestamp)
     assert(await polyGov.getVoteCount() == 2, "Vote count should increment correctly")
   });
   it("Test getVoteInfo()", async function() {
+    await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("20"))
+    await token.connect(accounts[2]).approve(flex.address, web3.utils.toWei("20"))
+    await flex.connect(accounts[2]).depositStake(web3.utils.toWei("20"))
+    await flex.connect(accounts[2]).submitValue(h.uintTob32(1), h.uintTob32(100), 0, '0x')
+    blocky0 = await h.getBlock()
     await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, true, 0)
-    blocky = await h.getBlock()
+    await polyGov.connect(accounts[1]).beginDispute(h.uintTob32(1), blocky0.timestamp)
+    blocky1 = await h.getBlock()
     await polyGov.connect(accounts[1]).vote(1, true, false)
     await h.advanceTime(86400 * 7)
     await polyGov.connect(accounts[1]).tallyVotes(1)
@@ -281,16 +267,15 @@ describe("Polygon Governance Function Tests", function() {
     await h.advanceTime(86400)
     await polyGov.executeVote(1)
     voteInfo = await polyGov.getVoteInfo(1)
-    abiCoder = new ethers.utils.AbiCoder
     proposalData = abiCoder.encode(['address', 'bool'], [accounts[2].address, 'true'])
-    hash = ethers.utils.solidityKeccak256(['address', 'bytes4', 'bytes', 'uint256'], [polyGov.address, '0xa3cb1604', proposalData, blocky.timestamp])
+    hash = ethers.utils.solidityKeccak256(['bytes32', 'uint256'], [h.uintTob32(1), blocky0.timestamp])
     assert(voteInfo[0] == hash, "Vote hash should be correct")
     assert(voteInfo[1][0] == 1, "Vote round should be correct")
-    assert(voteInfo[1][1] == blocky.timestamp, "Vote start date should be correct")
-    assert(voteInfo[1][2] == blocky.number, "Vote blocknumber should be correct")
+    assert(voteInfo[1][1] == blocky1.timestamp, "Vote start date should be correct")
+    assert(voteInfo[1][2] == blocky1.number, "Vote blocknumber should be correct")
     assert(voteInfo[1][3] == web3.utils.toWei("10"), "Vote fee should be correct")
     assert(voteInfo[1][4] == blocky2.timestamp, "Vote tallyDate should be correct")
-    assert(voteInfo[1][5] == web3.utils.toWei("990"), "Vote tokenholders doesSupport should be correct")
+    assert(voteInfo[1][5] == web3.utils.toWei("970"), "Vote tokenholders doesSupport should be correct")
     assert(voteInfo[1][6] == 0, "Vote tokenholders against should be correct")
     assert(voteInfo[1][7] == 0, "Vote tokenholders invalid should be correct")
     assert(voteInfo[1][8] == 0, "Vote users doesSupport should be correct")
@@ -303,92 +288,50 @@ describe("Polygon Governance Function Tests", function() {
     assert(voteInfo[1][15] == 0, "Vote teamMultisig against should be correct")
     assert(voteInfo[1][16] == 0, "Vote teamMultisig invalid should be correct")
     assert(voteInfo[2][0], "Vote executed should be true")
-    assert(voteInfo[2][1] == false, "Vote isDispute should be false")
+    assert(voteInfo[2][1] == true, "Vote isDispute should be false")
     assert(voteInfo[3] == 1, "Vote result should be PASSED")
-    assert(voteInfo[4] == proposalData, "Vote proposal data should be correct")
-    assert(voteInfo[5] == '0xa3cb1604', "Vote function identifier should be correct")
-    assert(voteInfo[6][0] == polyGov.address, "Vote destination address should be correct")
+    assert(voteInfo[4] == '0x', "Vote proposal data should be correct")
+    assert(voteInfo[5] == '0x00000000', "Vote function identifier should be correct")
+    assert(voteInfo[6][0] == '0x0000000000000000000000000000000000000000', "Vote destination address should be correct")
     assert(voteInfo[6][1] == accounts[1].address, "Vote initiator address should be correct")
   });
   it("Test getVoteRounds()", async function() {
+    await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("20"))
+    await token.connect(accounts[2]).approve(flex.address, web3.utils.toWei("20"))
+    await flex.connect(accounts[2]).depositStake(web3.utils.toWei("20"))
+    await flex.connect(accounts[2]).submitValue(h.uintTob32(1), h.uintTob32(100), 0, '0x')
+    blocky0 = await h.getBlock()
     await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, true, 0)
-    blocky = await h.getBlock()
-    hash = ethers.utils.solidityKeccak256(['address', 'bytes4', 'bytes', 'uint256'], [polyGov.address, '0xa3cb1604', proposalData, blocky.timestamp])
+    await polyGov.connect(accounts[1]).beginDispute(h.uintTob32(1), blocky0.timestamp)
+    blocky1 = await h.getBlock()
+    hash = ethers.utils.solidityKeccak256(['bytes32', 'uint256'], [h.uintTob32(1), blocky0.timestamp])
     voteRounds = await polyGov.getVoteRounds(hash)
     assert(voteRounds.length == 1, "Vote rounds length should be correct")
     assert(voteRounds[0] == 1, "Vote rounds disputeIds should be correct")
-    await h.advanceTime(86400 * 7)
+    await h.advanceTime(86400 * 2)
     await polyGov.connect(accounts[1]).tallyVotes(1)
     await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("20"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, true, blocky.timestamp)
+    await polyGov.connect(accounts[1]).beginDispute(h.uintTob32(1), blocky0.timestamp)
     voteRounds = await polyGov.getVoteRounds(hash)
     assert(voteRounds.length == 2, "Vote rounds length should be correct")
     assert(voteRounds[0] == 1, "Vote round disputeId should be correct")
     assert(voteRounds[1] == 2, "Vote round disputeId should be correct")
   });
-  it("Test isUser()", async function() {
-    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, true, 0)
-    await polyGov.connect(accounts[1]).vote(1, true, false)
-    await h.advanceTime(86400 * 7)
-    await polyGov.connect(accounts[1]).tallyVotes(1)
-    await h.advanceTime(86400)
-    assert(await polyGov.isUser(accounts[2].address) == false, "isUser should be false for unapproved user")
-    await polyGov.executeVote(1)
-    assert(await polyGov.isUser(accounts[2].address), "isUser should be true for approved user")
-  });
-  it("Test _proposeVote()", async function() {
-    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, true, 0)
-    blocky = await h.getBlock()
-    assert(await polyGov.getVoteCount() == 1, "Vote count should be correct")
-    abiCoder = new ethers.utils.AbiCoder
-    proposalData = abiCoder.encode(['address', 'bool'], [accounts[2].address, 'true'])
-    hash = ethers.utils.solidityKeccak256(['address', 'bytes4', 'bytes', 'uint256'], [polyGov.address, '0xa3cb1604', proposalData, blocky.timestamp])
-    voteRounds = await polyGov.getVoteRounds(hash)
-    assert(voteRounds.length == 1, "Vote rounds length should be correct")
-    assert(voteRounds[0] == 1, "Vote round disputeId should be correct")
-    voteInfo = await polyGov.getVoteInfo(1)
-    assert(voteInfo[0] == hash, "Vote hash should be correct")
-    assert(voteInfo[1][0] == 1, "Vote round should be correct")
-    assert(voteInfo[1][1] == blocky.timestamp, "Vote start date should be correct")
-    assert(voteInfo[1][2] == blocky.number, "Vote blocknumber should be correct")
-    assert(voteInfo[1][3] == web3.utils.toWei("10"), "Vote fee should be correct")
-    assert(voteInfo[4] == proposalData, "Vote proposal data should be correct")
-    assert(voteInfo[5] == '0xa3cb1604', "Vote function identifier should be correct")
-    assert(voteInfo[6][0] == polyGov.address, "Vote destination address should be correct")
-    assert(voteInfo[6][1] == accounts[1].address, "Vote initiator address should be correct")
-    await h.advanceTime(86400 * 7)
-    await polyGov.connect(accounts[1]).tallyVotes(1)
-    await h.expectThrow(polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, true, blocky.timestamp)) // Fee must be paid
-    await h.advanceTime(86400)
-    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("20"))
-    await h.expectThrow(polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, true, blocky.timestamp)) // New dispute round must be started within a day
-  });
-  it("Test updateUserList()", async function() {
-    await h.expectThrow(polyGov.connect(accounts[1]).updateUserList(accounts[1].address, true)) //
-    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, true, 0)
-    await polyGov.connect(accounts[1]).vote(1, true, false)
-    await h.advanceTime(86400 * 7)
-    await polyGov.connect(accounts[1]).tallyVotes(1)
-    await h.advanceTime(86400)
-    await polyGov.executeVote(1)
-    assert(await polyGov.isUser(accounts[2].address), "isUser should be correct")
-    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, false, 0)
-    await polyGov.connect(accounts[1]).vote(2, true, false)
-    await h.advanceTime(86400 * 7)
-    await polyGov.connect(accounts[1]).tallyVotes(2)
-    await h.advanceTime(86400)
-    await polyGov.executeVote(2)
-    assert(await polyGov.isUser(accounts[2].address) == false, "isUser should be correct")
-  });
   it("Test getVoteTallyByAddress()", async function() {
-    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("1000"))
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[2].address, true, 0)
-    await polyGov.connect(accounts[1]).proposeUpdateUserList(accounts[3].address, true, 0)
+    await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("20"))
+    await token.connect(accounts[2]).approve(flex.address, web3.utils.toWei("20"))
+    await flex.connect(accounts[2]).depositStake(web3.utils.toWei("20"))
+    await flex.connect(accounts[2]).submitValue(h.uintTob32(1), h.uintTob32(100), 0, '0x')
+    blocky0 = await h.getBlock()
+    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
+    await polyGov.connect(accounts[1]).beginDispute(h.uintTob32(1), blocky0.timestamp)
+    await token.connect(accounts[1]).transfer(accounts[3].address, web3.utils.toWei("20"))
+    await token.connect(accounts[3]).approve(flex.address, web3.utils.toWei("20"))
+    await flex.connect(accounts[3]).depositStake(web3.utils.toWei("20"))
+    await flex.connect(accounts[3]).submitValue(h.uintTob32(1), h.uintTob32(100), 0, '0x')
+    blocky0 = await h.getBlock()
+    await token.connect(accounts[1]).approve(polyGov.address, web3.utils.toWei("10"))
+    await polyGov.connect(accounts[1]).beginDispute(h.uintTob32(1), blocky0.timestamp)
     assert(await polyGov.getVoteTallyByAddress(accounts[1].address) == 0, "Vote tally should be correct")
     await polyGov.connect(accounts[1]).vote(1, true, false)
     assert(await polyGov.getVoteTallyByAddress(accounts[1].address) == 1, "Vote tally should be correct")
