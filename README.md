@@ -1,8 +1,8 @@
-[![Tests](https://github.com/tellor-io/polygonGovernance/actions/workflows/tests.yml/badge.svg)](https://github.com/tellor-io/polygonGovernance/actions/workflows/tests.ymli)
+[![Tests](https://github.com/tellor-io/governance/actions/workflows/tests.yml/badge.svg)](https://github.com/tellor-io/governance/actions/workflows/tests.ymli)
 
 ## Overview <a name="overview"> </a>
 
-<b>PolygonGovernance</b> is a governance contract which manages disputes and proposals for [Tellor on other EVM blockchains](https://github.com/tellor-io/tellorFlex). It shares a lot in common with mainnet Tellor, but it is more streamlined and modular.
+<b>Governance</b> is a governance contract which manages disputes and proposals for [Tellor on other EVM blockchains](https://github.com/tellor-io/tellorFlex). 
 
 For more in-depth information about Tellor checkout our [documenation](https://docs.tellor.io/tellor/), [whitepaper](https://docs.tellor.io/tellor/whitepaper/introduction) and [website](https://tellor.io/).
 
