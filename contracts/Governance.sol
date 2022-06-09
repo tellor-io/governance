@@ -2,6 +2,8 @@
 pragma solidity 0.8.3;
 
 import "./TellorFlex.sol";
+import "usingtellor/contracts/UsingTellor.sol";
+import "hardhat/console.sol";
 
 /**
  @author Tellor Inc.
@@ -10,16 +12,16 @@ import "./TellorFlex.sol";
  * Tellor oracle data, proposing system parameter changes, and voting on those
  * disputes and proposals.
 */
-contract Governance {
+contract Governance is UsingTellor {
     // Storage
-    TellorFlex public tellor; // Tellor oracle contract
+    TellorFlex public oracle; // Tellor oracle contract
     IERC20 public token; // token used for dispute fees, same as reporter staking token
     address public teamMultisig; // address of team multisig wallet, one of four stakeholder groups
     uint256 public voteCount; // total number of votes initiated
     uint256 public disputeFee; // dispute fee for a vote
+    bytes32 public autopayAddrsQueryId = keccak256(abi.encode("AutopayAddresses", abi.encode(bytes('')))); // query id for autopay addresses array
     mapping(uint256 => Dispute) private disputeInfo; // mapping of dispute IDs to the details of the dispute
     mapping(bytes32 => uint256) private openDisputesOnId; // mapping of a query ID to the number of disputes on that query ID
-    mapping(address => bool) private users; // mapping of users with voting power, determined by governance proposal votes
     mapping(uint256 => Vote) private voteInfo; // mapping of dispute IDs to the details of the vote
     mapping(bytes32 => uint256[]) private voteRounds; // mapping of vote identifier hashes to an array of dispute IDs
     mapping(address => uint256) private voteTallyByAddress; // mapping of addresses to the number of votes they have cast
@@ -101,12 +103,12 @@ contract Governance {
      * stakeholder groups
      */
     constructor(
-        address _tellor,
+        address payable _tellor,
         uint256 _disputeFee,
         address _teamMultisig
-    ) {
-        tellor = TellorFlex(_tellor);
-        token = tellor.token();
+    ) UsingTellor(_tellor) {
+        oracle = TellorFlex(_tellor);
+        token = oracle.token();
         disputeFee = _disputeFee;
         teamMultisig = _teamMultisig;
     }
@@ -119,7 +121,7 @@ contract Governance {
     function beginDispute(bytes32 _queryId, uint256 _timestamp) external {
         // Ensure value actually exists
         require(
-            tellor.getBlockNumberByTimestamp(_queryId, _timestamp) != 0,
+            oracle.getBlockNumberByTimestamp(_queryId, _timestamp) != 0,
             "no value exists at given timestamp"
         );
         bytes32 _hash = keccak256(abi.encodePacked(_queryId, _timestamp));
@@ -136,7 +138,7 @@ contract Governance {
             ); // Within a day for new round
         } else {
             require(
-                block.timestamp - _timestamp < tellor.reportingLock(),
+                block.timestamp - _timestamp < 12 hours,
                 "Dispute must be started within reporting lock time"
             ); // New dispute within reporting lock
             openDisputesOnId[_queryId]++;
@@ -147,8 +149,8 @@ contract Governance {
         // Initialize dispute information - query ID, timestamp, value, etc.
         _thisDispute.queryId = _queryId;
         _thisDispute.timestamp = _timestamp;
-        _thisDispute.value = tellor.retrieveData(_queryId, _timestamp);
-        _thisDispute.disputedReporter = tellor.getReporterByTimestamp(
+        _thisDispute.value = oracle.retrieveData(_queryId, _timestamp);
+        _thisDispute.disputedReporter = oracle.getReporterByTimestamp(
             _queryId,
             _timestamp
         );
@@ -166,8 +168,8 @@ contract Governance {
         } else {
             _fee = disputeFee * 2**(voteRounds[_hash].length - 1);
         }
-        if (_fee > tellor.stakeAmount()) {
-          _fee = tellor.stakeAmount();
+        if (_fee > oracle.stakeAmount()) {
+          _fee = oracle.stakeAmount();
         }
         _thisVote.fee = _fee;
         _thisVote.fee = _fee;
@@ -176,11 +178,11 @@ contract Governance {
             "Fee must be paid"
         ); // This is the dispute fee. Returned if dispute passes
         if (voteRounds[_hash].length == 1) {
-            _thisDispute.slashedAmount = tellor.slashReporter(
+            _thisDispute.slashedAmount = oracle.slashReporter(
                 _thisDispute.disputedReporter,
                 address(this)
             );
-            tellor.removeValue(_queryId, _timestamp);
+            oracle.removeValue(_queryId, _timestamp);
         } else {
             _thisDispute.slashedAmount = disputeInfo[voteRounds[_hash][0]]
                 .slashedAmount;
@@ -290,80 +292,6 @@ contract Governance {
     }
 
     /**
-     * @dev Initializes proposal to change oracle governance address
-     * @param _newGovernanceAddress proposed new governance address
-     * @param _timestamp used to differentiate proposals. If set to zero, timestamp
-     * will automatically be reset to block timestamp
-     */
-    function proposeChangeGovernanceAddress(
-        address _newGovernanceAddress,
-        uint256 _timestamp
-    ) external {
-        _proposeVote(
-            address(tellor),
-            bytes4(keccak256(bytes("changeGovernanceAddress(address)"))),
-            abi.encode(_newGovernanceAddress),
-            _timestamp
-        );
-    }
-
-    /**
-     * @dev Initializes proposal to change reporting lock time
-     * @param _newReportingLock proposed new reporting lock time
-     * @param _timestamp used to differentiate proposals. If set to zero, timestamp
-     * will automatically be reset to block timestamp
-     */
-    function proposeChangeReportingLock(
-        uint256 _newReportingLock,
-        uint256 _timestamp
-    ) external {
-        _proposeVote(
-            address(tellor),
-            bytes4(keccak256(bytes("changeReportingLock(uint256)"))),
-            abi.encode(_newReportingLock),
-            _timestamp
-        );
-    }
-
-    /**
-     * @dev Initializes proposal to change stake amount
-     * @param _newStakeAmount proposed new stake amount
-     * @param _timestamp used to differentiate proposals. If set to zero, timestamp
-     * will automatically be reset to block timestamp
-     */
-    function proposeChangeStakeAmount(
-        uint256 _newStakeAmount,
-        uint256 _timestamp
-    ) external {
-        _proposeVote(
-            address(tellor),
-            bytes4(keccak256(bytes("changeStakeAmount(uint256)"))),
-            abi.encode(_newStakeAmount),
-            _timestamp
-        );
-    }
-
-    /**
-     * @dev Initializes proposal to update user stakeholder list
-     * @param _address address whose user status to update
-     * @param _isUser true to set address as user, false to remove address from user list
-     * @param _timestamp used to differentiate proposals. If set to zero, timestamp
-     * will automatically be reset to block timestamp
-     */
-    function proposeUpdateUserList(
-        address _address,
-        bool _isUser,
-        uint256 _timestamp
-    ) external {
-        _proposeVote(
-            address(this),
-            bytes4(keccak256(bytes("updateUserList(address,bool)"))),
-            abi.encode(_address, _isUser),
-            _timestamp
-        );
-    }
-
-    /**
      * @dev Tallies the votes and begins the 1 day challenge period
      * @param _disputeId is the dispute id
      */
@@ -399,23 +327,19 @@ contract Governance {
             _thisVote.users.against +
             _thisVote.users.invalidQuery;
         // Cannot divide by zero
-        if (
-            tokenVoteSum * reportersVoteSum * multisigVoteSum * usersVoteSum ==
-            0
-        ) {
-            if (tokenVoteSum == 0) {
-                tokenVoteSum++;
-            }
-            if (reportersVoteSum == 0) {
-                reportersVoteSum++;
-            }
-            if (multisigVoteSum == 0) {
-                multisigVoteSum++;
-            }
-            if (usersVoteSum == 0) {
-                usersVoteSum++;
-            }
+        if (tokenVoteSum == 0) {
+            tokenVoteSum++;
         }
+        if (reportersVoteSum == 0) {
+            reportersVoteSum++;
+        }
+        if (multisigVoteSum == 0) {
+            multisigVoteSum++;
+        }
+        if (usersVoteSum == 0) {
+            usersVoteSum++;
+        }
+        
         // Normalize and combine each stakeholder group votes
         uint256 scaledDoesSupport = ((_thisVote.tokenholders.doesSupport *
             10000) / tokenVoteSum) +
@@ -457,20 +381,6 @@ contract Governance {
     }
 
     /**
-     * @dev Changes address's status as user. Can only be called by this contract
-     * through a proposeUpdateUserList proposal
-     * @param _address address whose user status to update
-     * @param _isUser true to set address as user, false to remove address from user list
-     */
-    function updateUserList(address _address, bool _isUser) external {
-        require(
-            msg.sender == address(this),
-            "Only governance can update user list"
-        );
-        users[_address] = _isUser;
-    }
-
-    /**
      * @dev Enables the sender address to cast a vote
      * @param _disputeId is the ID of the vote
      * @param _supports is the address's vote: whether or not they support or are against
@@ -488,49 +398,28 @@ contract Governance {
         require(!_thisVote.voted[msg.sender], "Sender has already voted");
         // Update voting status and increment total queries for support, invalid, or against based on vote
         _thisVote.voted[msg.sender] = true;
-        uint256 voteWeight = token.balanceOf(msg.sender);
-        (, uint256 stakedBalance, uint256 lockedBalance, , ) = tellor
+        uint256 _tokenBalance = token.balanceOf(msg.sender);
+        (, uint256 stakedBalance, uint256 lockedBalance, , ) = oracle
             .getStakerInfo(msg.sender);
-        voteWeight += stakedBalance + lockedBalance;
-        if (_thisVote.isDispute && _invalidQuery) {
-            if (voteWeight > 0) {
-                _thisVote.tokenholders.invalidQuery += voteWeight;
-            }
-            voteWeight = tellor.getReportsSubmittedByAddress(msg.sender);
-            if (voteWeight > 0) {
-                _thisVote.reporters.invalidQuery += voteWeight;
-            }
-            if (users[msg.sender]) {
-                _thisVote.users.invalidQuery += 1;
-            }
+        _tokenBalance += stakedBalance + lockedBalance;
+        if (_invalidQuery) {
+            _thisVote.tokenholders.invalidQuery += _tokenBalance;
+            _thisVote.reporters.invalidQuery += oracle.getReportsSubmittedByAddress(msg.sender);
+            _thisVote.users.invalidQuery += _getUserTips(msg.sender);
             if (msg.sender == teamMultisig) {
                 _thisVote.teamMultisig.invalidQuery += 1;
             }
         } else if (_supports) {
-            if (voteWeight > 0) {
-                _thisVote.tokenholders.doesSupport += voteWeight;
-            }
-            voteWeight = tellor.getReportsSubmittedByAddress(msg.sender);
-            if (voteWeight > 0) {
-                _thisVote.reporters.doesSupport += voteWeight;
-            }
-            if (users[msg.sender]) {
-                _thisVote.users.doesSupport += 1;
-            }
+            _thisVote.tokenholders.doesSupport += _tokenBalance;
+            _thisVote.reporters.doesSupport += oracle.getReportsSubmittedByAddress(msg.sender);
+            _thisVote.users.doesSupport += _getUserTips(msg.sender);
             if (msg.sender == teamMultisig) {
                 _thisVote.teamMultisig.doesSupport += 1;
             }
         } else {
-            if (voteWeight > 0) {
-                _thisVote.tokenholders.against += voteWeight;
-            }
-            voteWeight = tellor.getReportsSubmittedByAddress(msg.sender);
-            if (voteWeight > 0) {
-                _thisVote.reporters.against += voteWeight;
-            }
-            if (users[msg.sender]) {
-                _thisVote.users.against += 1;
-            }
+            _thisVote.tokenholders.against += _tokenBalance;
+            _thisVote.reporters.against += oracle.getReportsSubmittedByAddress(msg.sender);
+            _thisVote.users.against += _getUserTips(msg.sender);
             if (msg.sender == teamMultisig) {
                 _thisVote.teamMultisig.against += 1;
             }
@@ -677,66 +566,30 @@ contract Governance {
         return voteTallyByAddress[_voter];
     }
 
-    /**
-     * @dev Returns boolean value for whether a given address is set as a user with
-     * voting rights
-     * @param _address address of potential user
-     * @return bool whether or not the address is set as a user
-     */
-    function isUser(address _address) external view returns (bool) {
-        return users[_address];
-    }
-
     // Internal
     /**
-     * @dev Proposes a vote for an associated Tellor contract and function, and defines the properties of the vote
-     * @param _contract is the Tellor contract to propose a vote for -> used to calculate identifier hash
-     * @param _function is the Tellor function to propose a vote for -> used to calculate identifier hash
-     * @param _data is the function argument data associated with the vote proposal -> used to calculate identifier hash
-     * @param _timestamp is the timestamp associated with the vote -> used to calculate identifier hash
+     * @dev Retrieves total tips contributed to autopay by a given address
+     * @param _user address of the user to check the tip count for
+     * @return uint256 total tips contributed to autopay by the address
      */
-    function _proposeVote(
-        address _contract,
-        bytes4 _function,
-        bytes memory _data,
-        uint256 _timestamp
-    ) internal {
-        // Update vote count, vote ID, current vote, and timestamp
-        voteCount++;
-        uint256 _disputeId = voteCount;
-        Vote storage _thisVote = voteInfo[_disputeId];
-        if (_timestamp == 0) {
-            _timestamp = block.timestamp;
+    function _getUserTips(address _user) internal returns (uint256) {
+        // get autopay addresses array from oracle
+        (, bytes memory _autopayAddrsBytes, uint256 _timestamp) = getDataBefore(autopayAddrsQueryId, block.timestamp - 12 hours);
+        if(_timestamp > 0) {
+            address[] memory _autopayAddrs = abi.decode(_autopayAddrsBytes, (address[]));
+            uint256 _userTipTally;
+            // iterate through autopay addresses retrieve tips by user address
+            for(uint256 _i=0; _i<_autopayAddrs.length; _i++) {
+                (bool _success, bytes memory _returnData) = _autopayAddrs[_i].call(
+                    abi.encodeWithSignature("getTipsByAddress(address)", _user)   
+                );
+                if(_success) {
+                    _userTipTally += abi.decode(_returnData, (uint256));
+                }
+            }
+            return _userTipTally;
+        } else {
+            return 0;
         }
-        // Calculate vote identifier hash and push to vote rounds
-        bytes32 _hash = keccak256(
-            abi.encodePacked(_contract, _function, _data, _timestamp)
-        );
-        voteRounds[_hash].push(_disputeId);
-        // Ensure new dispute round started within a day
-        if (voteRounds[_hash].length > 1) {
-            uint256 _prevId = voteRounds[_hash][voteRounds[_hash].length - 2];
-            require(
-                block.timestamp - voteInfo[_prevId].tallyDate < 1 days,
-                "New dispute round must be started within a day"
-            ); // 1 day for new disputes
-        }
-        // Calculate fee to propose vote. Starts as just 10 tokens flat, doubles with each round
-        uint256 _fee = 10e18 * 2**(voteRounds[_hash].length - 1);
-        require(
-            token.transferFrom(msg.sender, address(this), _fee),
-            "Fee must be paid"
-        );
-        // Update information on vote -- hash, vote round, start date, block number, fee, etc.
-        _thisVote.identifierHash = _hash;
-        _thisVote.voteRound = voteRounds[_hash].length;
-        _thisVote.startDate = block.timestamp;
-        _thisVote.blockNumber = block.number;
-        _thisVote.fee = _fee;
-        _thisVote.data = _data;
-        _thisVote.voteFunction = _function;
-        _thisVote.voteAddress = _contract;
-        _thisVote.initiator = msg.sender;
-        emit NewVote(_contract, _function, _data, _disputeId);
     }
 }
