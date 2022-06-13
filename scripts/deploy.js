@@ -67,6 +67,13 @@ async function deployPolygonGovernance(_network, _pk, _nodeURL, tellorAdd, dispu
     } else if (net == "xdai"){ //https://blockscout.com/poa/xdai/address/
       console.log("Governance contract deployed to:","https://blockscout.com/xdai/mainnet/address/"+ governance.address)
       console.log("    transaction hash:", "https://blockscout.com/xdai/mainnet/tx/" + governance.deployTransaction.hash);
+    } else if (net == "op_kovan"){ 
+        console.log("tellor contract deployed to:","https://kovan-optimistic.etherscan.io/address/"+ tellor.address)
+        console.log("    transaction hash:", "https://kovan-optimistic.etherscan.io/tx/" + tellor.deployTransaction.hash);
+    } else if (net == "ropsten"){
+        console.log("tellor contract deployed to:","https://ropsten.etherscan.io/address/"+ tellor.address)
+        console.log("    transaction hash:", "https://ropsten.etherscan.io/tx/" + tellor.deployTransaction.hash);   
+  
     } else {
         console.log("Please add network explorer details")
     }
