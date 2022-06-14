@@ -171,12 +171,15 @@ contract Governance is UsingTellor {
         if (_fee > oracle.stakeAmount()) {
           _fee = oracle.stakeAmount();
         }
-        _thisVote.fee = _fee;
-        _thisVote.fee = _fee;
+        
+        _thisVote.fee = _fee;  
         require(
             token.transferFrom(msg.sender, address(this), _fee),
             "Fee must be paid"
         ); // This is the dispute fee. Returned if dispute passes
+
+        // The slashedAmount is set in TellorFlex.slashReporter function
+        // It allows for slashing one stake per disputed value for the same reporter
         if (voteRounds[_hash].length == 1) {
             _thisDispute.slashedAmount = oracle.slashReporter(
                 _thisDispute.disputedReporter,
@@ -185,7 +188,7 @@ contract Governance is UsingTellor {
             oracle.removeValue(_queryId, _timestamp);
         } else {
             _thisDispute.slashedAmount = disputeInfo[voteRounds[_hash][0]]
-                .slashedAmount;
+                .slashedAmount;  //where is this set for voteRounds[_hash][0]? is it a saved var BL ???
         }
         emit NewDispute(
             _disputeId,
@@ -211,6 +214,8 @@ contract Governance is UsingTellor {
             voteRounds[_thisVote.identifierHash].length == _thisVote.voteRound,
             "Must be the final vote"
         );
+        //The time that has to pass to be ablet to execute increases as the voteRounds 
+        // for the dispute increases by a day per round
         require(
             block.timestamp - _thisVote.tallyDate >=
                 86400 * _thisVote.voteRound,
@@ -218,7 +223,7 @@ contract Governance is UsingTellor {
         );
         _thisVote.executed = true;
         if (!_thisVote.isDispute) {
-            // If vote is not in dispute and passed, execute proper vote function with vote data
+            // If vote is not in dispute and appropriate time has passed, then execute proper vote function with vote data
             if (_thisVote.result == VoteResult.PASSED) {
                 address _destination = _thisVote.voteAddress;
                 bool _succ;
