@@ -40,7 +40,7 @@ describe("Governance Function Tests", function() {
     let blocky = await h.getBlock()
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("10"))
     let balance1 = await token.balanceOf(accounts[2].address)
-    await h.expectThrow(gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)) //no value exists
+    await h.expectThrow(gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)) //no value exists for the timestamp provided
     await flex.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
     blocky = await h.getBlock()
     await h.expectThrow(gov.connect(accounts[4]).beginDispute(QUERYID1, blocky.timestamp)) // must have tokens to pay/begin dispute
@@ -133,10 +133,13 @@ describe("Governance Function Tests", function() {
   });
   it("Test tallyVotes()", async function() {
     // Test tallyVotes on dispute
+    // tallyVotes (1dispute could not have been executed, 2)or tallied, 
+    // 3)dispute does not exist 4) cannot tally before the voting time has ended)
     await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("20"))
     await token.connect(accounts[2]).approve(flex.address, web3.utils.toWei("20"))
     await flex.connect(accounts[2]).depositStake(web3.utils.toWei("20"))
     await flex.connect(accounts[2]).submitValue(h.uintTob32(1), h.uintTob32(100), 0, '0x')
+    await h.expectThrow(gov.connect(accounts[1]).tallyVotes(1)) // Cannot tally a dispute that does not exist
     blocky = await h.getBlock()
     await token.connect(accounts[1]).approve(gov.address, web3.utils.toWei("10"))
     await gov.connect(accounts[1]).beginDispute(h.uintTob32(1), blocky.timestamp)
@@ -146,6 +149,7 @@ describe("Governance Function Tests", function() {
     await gov.connect(accounts[1]).tallyVotes(1)
     blocky = await h.getBlock()
     await h.advanceTime(86400)
+    await h.expectThrow(gov.connect(accounts[1]).tallyVotes(1)) // cannot re-tally a dispute --BL
     voteInfo = await gov.getVoteInfo(1)
     assert(voteInfo[3] == 1, "Vote result should change")
     assert(voteInfo[1][4] == blocky.timestamp, "Tally date should be correct")
@@ -153,6 +157,7 @@ describe("Governance Function Tests", function() {
     await h.expectThrow(gov.connect(accounts[1]).tallyVotes(1)) // Dispute has been already executed
   });
   it("Test vote()", async function() {
+    // vote (1 dispute must exist, 2)cannot have been tallied, 3)sender has already voted)
     await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("20"))
     await token.connect(accounts[2]).approve(flex.address, web3.utils.toWei("20"))
     await flex.connect(accounts[2]).depositStake(web3.utils.toWei("20"))
@@ -160,7 +165,7 @@ describe("Governance Function Tests", function() {
     blocky = await h.getBlock()
     await token.connect(accounts[1]).approve(gov.address, web3.utils.toWei("10"))
     await gov.connect(accounts[1]).beginDispute(h.uintTob32(1), blocky.timestamp)
-    await h.expectThrow(gov.connect(accounts[1]).vote(2, true, false)) // Vote does not exist
+    await h.expectThrow(gov.connect(accounts[1]).vote(2, true, false)) // Can't vote on dispute does not exist
     await gov.connect(accounts[1]).vote(1, true, false)
     await gov.connect(accounts[2]).vote(1, false, false)
     await h.expectThrow(gov.connect(accounts[1]).vote(1, true, false)) // Sender has already voted
