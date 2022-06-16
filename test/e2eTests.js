@@ -92,7 +92,7 @@ describe("Governance End-To-End Tests", function() {
     await gov.tallyVotes(3)
     for (var i = 1; i < 4; i++) {
       vars = await gov.getVoteInfo(i)
-      assert(vars[2][1] == true, "Vote isDispute should be false")
+
       assert(vars[3] == 2, "Vote result should be INVALID")
     }
     await h.advanceTime(86400 * 2);

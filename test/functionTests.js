@@ -109,8 +109,7 @@ describe("Governance Function Tests", function() {
     vars = await gov.getVoteInfo(1)
     assert(vars[0] == _hash, "hash should be correct")
     assert(vars[1][0] == 1, "vote round should be correct")
-    assert(vars[2][0] == true, "vote should be executed")
-    assert(vars[2][1] == true, "is dispute")
+    assert(vars[2] == true, "vote should be executed")
     assert(vars[3] == true, "vote should pass")
     await token.connect(accounts[3]).approve(flex.address, web3.utils.toWei("1000"))
     await flex.connect(accounts[3]).depositStake(web3.utils.toWei("10"))
@@ -139,8 +138,9 @@ describe("Governance Function Tests", function() {
     await token.connect(accounts[2]).approve(flex.address, web3.utils.toWei("20"))
     await flex.connect(accounts[2]).depositStake(web3.utils.toWei("20"))
     await flex.connect(accounts[2]).submitValue(h.uintTob32(1), h.uintTob32(100), 0, '0x')
-    await h.expectThrow(gov.connect(accounts[1]).tallyVotes(1)) // Cannot tally a dispute that does not exist
     blocky = await h.getBlock()
+    await h.expectThrow(gov.connect(accounts[1]).tallyVotes(1)) // Cannot tally a dispute that does not exist
+    
     await token.connect(accounts[1]).approve(gov.address, web3.utils.toWei("10"))
     await gov.connect(accounts[1]).beginDispute(h.uintTob32(1), blocky.timestamp)
     await gov.connect(accounts[1]).vote(1, true, false)
@@ -274,7 +274,6 @@ describe("Governance Function Tests", function() {
     await h.advanceTime(86400)
     await gov.executeVote(1)
     voteInfo = await gov.getVoteInfo(1)
-    proposalData = abiCoder.encode(['address', 'bool'], [accounts[2].address, 'true'])
     hash = ethers.utils.solidityKeccak256(['bytes32', 'uint256'], [h.uintTob32(1), blocky0.timestamp])
     assert(voteInfo[0] == hash, "Vote hash should be correct")
     assert(voteInfo[1][0] == 1, "Vote round should be correct")
@@ -294,13 +293,9 @@ describe("Governance Function Tests", function() {
     assert(voteInfo[1][14] == 0, "Vote teamMultisig doesSupport should be correct")
     assert(voteInfo[1][15] == 0, "Vote teamMultisig against should be correct")
     assert(voteInfo[1][16] == 0, "Vote teamMultisig invalid should be correct")
-    assert(voteInfo[2][0], "Vote executed should be true")
-    assert(voteInfo[2][1] == true, "Vote isDispute should be false")
+    assert(voteInfo[2] == true, "Vote executed should be true")
     assert(voteInfo[3] == 1, "Vote result should be PASSED")
-    assert(voteInfo[4] == '0x', "Vote proposal data should be correct")
-    assert(voteInfo[5] == '0x00000000', "Vote function identifier should be correct")
-    assert(voteInfo[6][0] == '0x0000000000000000000000000000000000000000', "Vote destination address should be correct")
-    assert(voteInfo[6][1] == accounts[1].address, "Vote initiator address should be correct")
+    assert(voteInfo[4] == accounts[1].address, "Vote initiator address should be correct")
   });
   it("Test getVoteRounds()", async function() {
     await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("20"))
