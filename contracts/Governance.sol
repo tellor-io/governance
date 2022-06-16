@@ -16,6 +16,7 @@ contract Governance is UsingTellor {
     // Storage
     TellorFlex public oracle; // Tellor oracle contract
     IERC20 public token; // token used for dispute fees, same as reporter staking token
+    address public oracleAddress; //tellorFlex address
     address public teamMultisig; // address of team multisig wallet, one of four stakeholder groups
     uint256 public voteCount; // total number of votes initiated
     uint256 public disputeFee; // dispute fee for a vote
@@ -85,6 +86,7 @@ contract Governance is UsingTellor {
         address _initiator,
         address _reporter
     ); // Emitted when all casting for a vote is tallied
+    event NewDisputeFee(uint _disputeFee); //Emitted when the dispute fee changes based on changes to the Stake amount changes in the oracle
 
     /**
      * @dev Initializes contract parameters
@@ -95,12 +97,13 @@ contract Governance is UsingTellor {
      */
     constructor(
         address payable _tellor,
-        uint256 _disputeFee,
+        uint256 _disputeFee, 
         address _teamMultisig
     ) UsingTellor(_tellor) {
         oracle = TellorFlex(_tellor);
         token = oracle.token();
-        disputeFee = _disputeFee;
+        oracleAddress = _tellor;
+        disputeFee = _disputeFee; 
         teamMultisig = _teamMultisig;
     }
 
@@ -187,6 +190,18 @@ contract Governance is UsingTellor {
             _timestamp,
             _thisDispute.disputedReporter
         );
+    }
+
+    /**
+     * @dev Updates the TRB dispute fee when the TRB stakeAmount 
+     * is updated based on the current price of TRB in the oracle contract.
+     * Only the oracle contract can update this fee.
+     * @param _disputeFee is updated dispute fee
+     */
+    function changeDisputeFee(uint _disputeFee)external {
+        require(msg.sender == oracleAddress, "Must be initiated by oracle address when the stake amount changes");
+        disputeFee = _disputeFee;
+        emit NewDisputeFee(_disputeFee);
     }
 
     /**

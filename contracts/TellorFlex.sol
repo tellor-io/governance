@@ -538,3 +538,21 @@ contract TellorFlex {
         return reports[_queryId].valueByTimestamp[_timestamp];
     }
 }
+
+
+
+
+
+    // function _updateStakeAmount() internal {
+    //     (bool valFound, bytes memory val, uint256 timestamp) = getDataBefore(
+    //         trbUsdSpotPriceQueryId,
+    //         block.timestamp - 12 hours
+    //     );
+    //     if (valFound) {
+    //         uint256 priceTRB = abi.decode(val, (uint256));
+    //         stakeAmount = (stakeAmountDollarTarget / priceTRB) * 10**18;
+    //         uint _disputeFee = (stakeAmount / 1**17)/100;
+    //         IGovernance(governance).changeDisputeFee(_disputeFee);
+    //         emit NewStakeAmount(stakeAmount);
+    //     }
+    // }
