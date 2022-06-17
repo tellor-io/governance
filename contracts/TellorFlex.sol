@@ -3,6 +3,7 @@ pragma solidity 0.8.3;
 
 import "./interfaces/IERC20.sol";
 import "./interfaces/IGovernance.sol";
+import "hardhat/console.sol";
 
 
 /**
@@ -99,7 +100,7 @@ contract TellorFlex {
         owner = msg.sender;
         reportingLock = _reportingLock;
         stakeAmountDollarTarget = _stakeAmountDollarTarget;
-        stakeAmount = (_stakeAmountDollarTarget / _priceTRB) * 10**18;
+        stakeAmount = (_stakeAmountDollarTarget  * 10**18/ _priceTRB) * 1 ether;
     }
 
     function init(address _governanceAddress) external {
@@ -709,7 +710,7 @@ contract TellorFlex {
         );
         if (valFound) {
             uint256 priceTRB = abi.decode(val, (uint256));
-            stakeAmount = (stakeAmountDollarTarget / priceTRB) * 10**18;
+            stakeAmount = (stakeAmountDollarTarget * 100**18 / priceTRB);
             emit NewStakeAmount(stakeAmount);
         }
     }

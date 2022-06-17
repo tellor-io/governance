@@ -17,7 +17,7 @@ describe("Governance Function Tests", function() {
     await token.deployed();
     const Governance = await ethers.getContractFactory("Governance");
     const TellorFlex = await ethers.getContractFactory("TellorFlex")
-    flex = await TellorFlex.deploy(token.address, accounts[0].address, web3.utils.toWei("10"), 86400 / 2)
+    flex = await TellorFlex.deploy(token.address, 86400/2,"100", web3.utils.toWei("10"))
     await flex.deployed();
     gov = await Governance.deploy(flex.address, accounts[0].address);
     await gov.deployed();
@@ -93,7 +93,7 @@ describe("Governance Function Tests", function() {
     assert(vars[3] == accounts[1].address, "accounts[1] should be correct")
     assert(await gov.getOpenDisputesOnId(QUERYID1) == 1, "open disputes on ID should be correct")
     assert(await gov.getVoteRounds(_hash) == 1, "number of vote rounds should be correct")
-    assert(balance1 - balance2 - web3.utils.toWei("10") == 0, "dispute fee paid should be correct")
+    assert(balance1 - balance2 - web3.utils.toWei("1") == 0, "dispute fee paid should be correct")
     await h.expectThrow(gov.connect(accounts[2]).executeVote(10)) //dispute id must exist
     await h.advanceTime(86400 * 2);
     await h.expectThrow(gov.connect(accounts[2]).executeVote(1)) //vote must be tallied
@@ -125,10 +125,9 @@ describe("Governance Function Tests", function() {
     await h.expectThrow(gov.connect(accounts[2]).executeVote(1)) //vote must be the final vote
     await h.advanceTime(86400 * 2);
     await gov.tallyVotes(3)
+    await h.expectThrow(gov.connect(accounts[2]).executeVote(3)) //must wait longer 
     await h.advanceTime(86400);
-    await h.expectThrow(gov.connect(accounts[2]).executeVote(3)) //must wait longer for further rounds
-    await h.advanceTime(86400);
-    await gov.connect(accounts[2]).executeVote(3) //must wait longer for further rounds
+    await gov.connect(accounts[2]).executeVote(3)
   });
   it("Test tallyVotes()", async function() {
     // Test tallyVotes on dispute
@@ -174,7 +173,7 @@ describe("Governance Function Tests", function() {
     await h.expectThrow(gov.connect(accounts[1]).vote(1, true, false)) // Vote has already been tallied
     voteInfo = await gov.getVoteInfo(1)
     assert(voteInfo[1][5] - await token.balanceOf(accounts[1].address) == 0, "Tokenholders doesSupport tally should be correct")
-    assert(voteInfo[1][6] == web3.utils.toWei("10"), "Tokenholders doesSupport tally should be correct")
+    assert(voteInfo[1][6] == web3.utils.toWei("10"), "Tokenholders against tally should be correct")
     assert(voteInfo[1][7] == 0, "Tokenholders invalid tally should be correct")
     assert(voteInfo[1][8] == 0, "Users doesSupport tally should be correct")
     assert(voteInfo[1][9] == 0, "Users against tally should be correct")
@@ -279,9 +278,9 @@ describe("Governance Function Tests", function() {
     assert(voteInfo[1][0] == 1, "Vote round should be correct")
     assert(voteInfo[1][1] == blocky1.timestamp, "Vote start date should be correct")
     assert(voteInfo[1][2] == blocky1.number, "Vote blocknumber should be correct")
-    assert(voteInfo[1][3] == web3.utils.toWei("10"), "Vote fee should be correct")
+    assert(voteInfo[1][3] - web3.utils.toWei("1") == 0, "Vote fee should be correct")
     assert(voteInfo[1][4] == blocky2.timestamp, "Vote tallyDate should be correct")
-    assert(voteInfo[1][5] == web3.utils.toWei("970"), "Vote tokenholders doesSupport should be correct")
+    assert(voteInfo[1][5] == web3.utils.toWei("979"), "Vote tokenholders doesSupport should be correct")
     assert(voteInfo[1][6] == 0, "Vote tokenholders against should be correct")
     assert(voteInfo[1][7] == 0, "Vote tokenholders invalid should be correct")
     assert(voteInfo[1][8] == 0, "Vote users doesSupport should be correct")

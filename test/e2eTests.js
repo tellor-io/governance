@@ -22,7 +22,7 @@ describe("Governance End-To-End Tests", function() {
     await token.deployed();
     const Governance = await ethers.getContractFactory("Governance");
     const TellorFlex = await ethers.getContractFactory("TellorFlex")
-    flex = await TellorFlex.deploy(token.address, accounts[0].address, web3.utils.toWei("10"), 86400 / 2)
+    flex = await TellorFlex.deploy(token.address, 86400/2,"100", web3.utils.toWei("10"))
     await flex.deployed();
     gov = await Governance.deploy(flex.address,  accounts[0].address);
     await gov.deployed();
@@ -34,15 +34,15 @@ describe("Governance End-To-End Tests", function() {
   });
   it("Test multiple disputes", async function() {
     await token.connect(accounts[1]).approve(flex.address, web3.utils.toWei("1000"))
-    await flex.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
+    await flex.connect(accounts[1]).depositStake(web3.utils.toWei("100"))
     await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("100"))
     await token.connect(accounts[1]).transfer(accounts[3].address, web3.utils.toWei("100"))
     await token.connect(accounts[1]).transfer(accounts[4].address, web3.utils.toWei("100"))
     await token.connect(accounts[1]).transfer(accounts[5].address, web3.utils.toWei("100"))
     await token.connect(accounts[4]).approve(flex.address, web3.utils.toWei("100"))
-    await flex.connect(accounts[4]).depositStake(web3.utils.toWei("10"))
+    await flex.connect(accounts[4]).depositStake(web3.utils.toWei("100"))
     await token.connect(accounts[5]).approve(flex.address, web3.utils.toWei("100"))
-    await flex.connect(accounts[5]).depositStake(web3.utils.toWei("10"))
+    await flex.connect(accounts[5]).depositStake(web3.utils.toWei("100"))
     let blocky = await h.getBlock()
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("10"))
     let balance1 = await token.balanceOf(accounts[2].address)
@@ -115,7 +115,7 @@ describe("Governance End-To-End Tests", function() {
     balance2 = await token.balanceOf(accounts[2].address)
     await gov.executeVote(1)
     assert(await token.balanceOf(accounts[1].address) - balance1 == web3.utils.toWei("10"), "account1 balance should increase by original stake amount")
-    assert(await token.balanceOf(accounts[2].address) - balance2 == web3.utils.toWei("10"), "account2 balance should increase by fee amount")
+    assert(await token.balanceOf(accounts[2].address) - balance2 == web3.utils.toWei("1"), "account2 balance should increase by fee amount")
     voteInfo = await gov.getVoteInfo(1)
     assert(voteInfo[3] == 2, "Vote result should be correct")
   });
@@ -137,14 +137,14 @@ describe("Governance End-To-End Tests", function() {
     await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
     await gov.connect(accounts[1]).vote(2, true, false)
     await gov.connect(accounts[2]).vote(2, true, false)
-    await h.advanceTime(86400 * 2)
+    await h.advanceTime(86400 * 4)
     await gov.tallyVotes(2)
     // Round 3
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("40"))
     await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
     await gov.connect(accounts[1]).vote(3, true, false)
     await gov.connect(accounts[2]).vote(3, true, false)
-    await h.advanceTime(86400 * 2)
+    await h.advanceTime(86400 * 6)
     await gov.tallyVotes(3)
     // Execute
     await h.advanceTime(86400 * 3)
@@ -156,8 +156,8 @@ describe("Governance End-To-End Tests", function() {
     await gov.executeVote(3)
     await h.expectThrow(gov.executeVote(3)) // Vote has been executed
     assert(await token.balanceOf(accounts[1].address) - balance1 == 0, "account1 balance should not change")
-    assert(await token.balanceOf(accounts[2].address) - balance2 == web3.utils.toWei("40"), "account2 balance should increase by original stake amount plus fee amount")
-    assert(balanceGov - await token.balanceOf(gov.address) == web3.utils.toWei("40"), "governance balance should decrease by original stake amount plus fee amount")
+    assert(await token.balanceOf(accounts[2].address) - balance2 == web3.utils.toWei("17"), "account2 balance should increase by original stake amount plus fee amount")
+    assert(balanceGov - await token.balanceOf(gov.address) == web3.utils.toWei("17"), "governance balance should decrease by original stake amount plus fee amount")
     voteInfo = await gov.getVoteInfo(3)
     assert(voteInfo[3] == 1, "Vote result should be correct")
   });
@@ -168,25 +168,25 @@ describe("Governance End-To-End Tests", function() {
     await flex.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
     blocky = await h.getBlock()
     // Round 1
-    await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("10"))
+    await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("1"))
     await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
     await gov.connect(accounts[1]).vote(1, true, false)
     await gov.connect(accounts[2]).vote(1, true, false)
     await h.advanceTime(86400 * 2)
     await gov.tallyVotes(1)
     // Round 2
-    await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("20"))
+    await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("2"))
     await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
     await gov.connect(accounts[1]).vote(2, true, false)
     await gov.connect(accounts[2]).vote(2, true, false)
-    await h.advanceTime(86400 * 2)
+    await h.advanceTime(86400 * 4)
     await gov.tallyVotes(2)
     // Round 3
-    await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("40"))
+    await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("4"))
     await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
     await gov.connect(accounts[1]).vote(3, false, false)
     await gov.connect(accounts[2]).vote(3, false, false)
-    await h.advanceTime(86400 * 2)
+    await h.advanceTime(86400 * 6)
     await gov.tallyVotes(3)
     // Execute
     await h.advanceTime(86400 * 3)
@@ -197,9 +197,9 @@ describe("Governance End-To-End Tests", function() {
     await h.expectThrow(gov.executeVote(2)) // Must be the final vote
     await gov.executeVote(3)
     await h.expectThrow(gov.executeVote(3)) // Vote has been executed
-    assert(await token.balanceOf(accounts[1].address) - balance1 == web3.utils.toWei("40"), "account1 balance should increase by original stake amount plus fee amount")
+    assert(await token.balanceOf(accounts[1].address) - balance1 == web3.utils.toWei("17"), "account1 balance should increase by original stake amount plus fee amount")
     assert(await token.balanceOf(accounts[2].address) - balance2 == 0, "account2 balance should not change")
-    assert(balanceGov - await token.balanceOf(gov.address) == web3.utils.toWei("40"), "governance balance should decrease by original stake amount plus fee amount")
+    assert(balanceGov - await token.balanceOf(gov.address) == web3.utils.toWei("17"), "governance balance should decrease by original stake amount plus fee amount")
     voteInfo = await gov.getVoteInfo(3)
     assert(voteInfo[3] == 0, "Vote result should be correct")
   });
@@ -256,7 +256,7 @@ describe("Governance End-To-End Tests", function() {
     await gov.executeVote(1)
     // checks
     voteInfo = await gov.getVoteInfo(1)
-    assert(voteInfo[1][5] == web3.utils.toWei("950"), "Tokenholders doesSupport should be correct")
+    assert(voteInfo[1][5] == web3.utils.toWei("959"), "Tokenholders doesSupport should be correct")
     assert(voteInfo[1][6] == web3.utils.toWei("30"), "Tokenholders against should be correct")
     assert(voteInfo[1][7] == 0, "Tokenholders invalid should be correct")
     assert(voteInfo[1][8] == web3.utils.toWei("1"), "Users doesSupport should be correct")
