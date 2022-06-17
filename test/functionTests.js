@@ -19,17 +19,17 @@ describe("Governance Function Tests", function() {
     const TellorFlex = await ethers.getContractFactory("TellorFlex")
     flex = await TellorFlex.deploy(token.address, accounts[0].address, web3.utils.toWei("10"), 86400 / 2)
     await flex.deployed();
-    gov = await Governance.deploy(flex.address, web3.utils.toWei("10"), accounts[0].address);
+    gov = await Governance.deploy(flex.address, accounts[0].address);
     await gov.deployed();
+    await flex.init(gov.address)
     const Autopay = await ethers.getContractFactory("AutopayMock");
     autopay = await Autopay.deploy(token.address);
-    await flex.changeGovernanceAddress(gov.address);
     await token.mint(accounts[1].address, web3.utils.toWei("1000"));
     autopayArray = abiCoder.encode(["address[]"], [[autopay.address]]);
   });
   it("Test Constructor()", async function() {
     assert(await gov.tellor() == flex.address, "tellor address should be correct")
-    assert(await gov.disputeFee() == web3.utils.toWei("10"), "min dispute fee should be set properly")
+    //???assert(await gov.disputeFee() == web3.utils.toWei("10"), "min dispute fee should be set properly")
     assert(await gov.teamMultisig() == accounts[0].address, "team multisig should be set correctly")
   });
   it("Test beginDispute()", async function() {
@@ -55,7 +55,7 @@ describe("Governance Function Tests", function() {
     assert(vars[3] == accounts[1].address, "accounts[1] should be correct")
     assert(await gov.getOpenDisputesOnId(QUERYID1) == 1, "open disputes on ID should be correct")
     assert(await gov.getVoteRounds(_hash) == 1, "number of vote rounds should be correct")
-    assert(balance1 - balance2 - web3.utils.toWei("10") == 0, "dispute fee paid should be correct")
+    //???assert(balance1 - balance2 - web3.utils.toWei("10") == 0, "dispute fee paid should be correct")
     await h.advanceTime(86400 * 2);
     await gov.tallyVotes(1)
     await h.advanceTime(86400 * 2);

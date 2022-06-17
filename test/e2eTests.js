@@ -24,11 +24,11 @@ describe("Governance End-To-End Tests", function() {
     const TellorFlex = await ethers.getContractFactory("TellorFlex")
     flex = await TellorFlex.deploy(token.address, accounts[0].address, web3.utils.toWei("10"), 86400 / 2)
     await flex.deployed();
-    gov = await Governance.deploy(flex.address, web3.utils.toWei("10"), accounts[0].address);
+    gov = await Governance.deploy(flex.address,  accounts[0].address);
     await gov.deployed();
+    await flex.init(gov.address)
     const Autopay = await ethers.getContractFactory("AutopayMock");
     autopay = await Autopay.deploy(token.address);
-    await flex.changeGovernanceAddress(gov.address);
     await token.mint(accounts[1].address, web3.utils.toWei("1000"));
     autopayArray = abiCoder.encode(["address[]"], [[autopay.address]]);
   });

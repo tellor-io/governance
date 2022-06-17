@@ -19,7 +19,7 @@ contract Governance is UsingTellor {
     address public oracleAddress; //tellorFlex address
     address public teamMultisig; // address of team multisig wallet, one of four stakeholder groups
     uint256 public voteCount; // total number of votes initiated
-    uint256 public disputeFee; // dispute fee for a vote
+
     bytes32 public autopayAddrsQueryId = keccak256(abi.encode("AutopayAddresses", abi.encode(bytes('')))); // query id for autopay addresses array
     mapping(uint256 => Dispute) private disputeInfo; // mapping of dispute IDs to the details of the dispute
     mapping(bytes32 => uint256) private openDisputesOnId; // mapping of a query ID to the number of disputes on that query ID
@@ -86,24 +86,20 @@ contract Governance is UsingTellor {
         address _initiator,
         address _reporter
     ); // Emitted when all casting for a vote is tallied
-    event NewDisputeFee(uint _disputeFee); //Emitted when the dispute fee changes based on changes to the Stake amount changes in the oracle
 
     /**
      * @dev Initializes contract parameters
      * @param _tellor address of tellor oracle contract to be governed
-     * @param _disputeFee base dispute fee
      * @param _teamMultisig address of tellor team multisig, one of four voting
      * stakeholder groups
      */
     constructor(
         address payable _tellor,
-        uint256 _disputeFee, 
         address _teamMultisig
     ) UsingTellor(_tellor) {
         oracle = TellorFlex(_tellor);
         token = oracle.token();
-        oracleAddress = _tellor;
-        disputeFee = _disputeFee; 
+        oracleAddress = _tellor; 
         teamMultisig = _teamMultisig;
     }
 
@@ -155,12 +151,13 @@ contract Governance is UsingTellor {
         _thisVote.startDate = block.timestamp;
         _thisVote.voteRound = voteRounds[_hash].length;
        
+       uint _disputeFee = getDisputeFee();
         // Calculate dispute fee based on number of current vote rounds
         uint256 _fee;
         if (voteRounds[_hash].length == 1) {
-            _fee = disputeFee * 2**(openDisputesOnId[_queryId] - 1);
+            _fee = _disputeFee * 2**(openDisputesOnId[_queryId] - 1);
         } else {
-            _fee = disputeFee * 2**(voteRounds[_hash].length - 1);
+            _fee = _disputeFee * 2**(voteRounds[_hash].length - 1);
         }
         if (_fee > oracle.stakeAmount()) {
           _fee = oracle.stakeAmount();
@@ -193,18 +190,6 @@ contract Governance is UsingTellor {
     }
 
     /**
-     * @dev Updates the TRB dispute fee when the TRB stakeAmount 
-     * is updated based on the current price of TRB in the oracle contract.
-     * Only the oracle contract can update this fee.
-     * @param _disputeFee is updated dispute fee
-     */
-    function changeDisputeFee(uint _disputeFee)external {
-        require(msg.sender == oracleAddress, "Must be initiated by oracle address when the stake amount changes");
-        disputeFee = _disputeFee;
-        emit NewDisputeFee(_disputeFee);
-    }
-
-    /**
      * @dev Executes vote by using result and transferring balance to either
      * initiator or disputed reporter
      * @param _disputeId is the ID of the vote being executed
@@ -220,14 +205,12 @@ contract Governance is UsingTellor {
             voteRounds[_thisVote.identifierHash].length == _thisVote.voteRound,
             "Must be the final vote"
         );
-        //The time that has to pass to be able to execute increases as the voteRounds 
-        // for the dispute increases by a day per round
-        // or the withdrawal wait period has passed 6 days ??? isn't this locked BL
+        //The time  has to pass after the vote is tallied
         require(
-            block.timestamp - _thisVote.tallyDate >=
-                86400 * _thisVote.voteRound || block.timestamp - _thisVote.tallyDate >= 86400 * 6,
-            "Vote needs to be tallied and time must pass"
+            block.timestamp - _thisVote.tallyDate >=1 days, 
+            "1 day has to pass after tally to allow for disputes"
         );
+
         _thisVote.executed = true;
         
             Dispute storage _thisDispute = disputeInfo[_disputeId];
@@ -302,12 +285,11 @@ contract Governance is UsingTellor {
         require(!_thisVote.executed, "Dispute has already been executed");
         require(_thisVote.tallyDate == 0, "Vote has already been tallied");
         require(_disputeId <= voteCount, "Vote does not exist");
-        // Determine appropriate vote duration dispute status
-        uint256 _duration = 2 days;
-
-        // Ensure voting is not still open
+        // Determine appropriate vote duration dispute round
+        // Vote time increases as rounds increase but only up to 6 days (withdrawal period)
         require(
-            block.timestamp - _thisVote.startDate > _duration,
+            block.timestamp - _thisVote.startDate >=
+                86400 * _thisVote.voteRound || block.timestamp - _thisVote.startDate >= 86400 * 6,
             "Time for voting has not elapsed"
         );
         // Get total votes from each separate stakeholder group.  This will allow
@@ -397,7 +379,7 @@ contract Governance is UsingTellor {
         // Update voting status and increment total queries for support, invalid, or against based on vote
         _thisVote.voted[msg.sender] = true;
         uint256 _tokenBalance = token.balanceOf(msg.sender);
-        (, uint256 stakedBalance, uint256 lockedBalance, , ) = oracle
+        (, uint256 stakedBalance, uint256 lockedBalance, , , , , ) = oracle
             .getStakerInfo(msg.sender);
         _tokenBalance += stakedBalance + lockedBalance;
         if (_invalidQuery) {
@@ -426,7 +408,12 @@ contract Governance is UsingTellor {
         emit Voted(_disputeId, _supports, msg.sender, _invalidQuery);
     }
 
-    // Getters
+    // *****************************************************************************
+    // *                                                                           *
+    // *                               Getters                                     *
+    // *                                                                           *
+    // *****************************************************************************
+
     /**
      * @dev Determines if an address voted for a specific vote
      * @param _disputeId is the ID of the vote
@@ -440,6 +427,17 @@ contract Governance is UsingTellor {
     {
         return voteInfo[_disputeId].voted[_voter];
     }
+
+    /**
+     * @dev Get the latest dispute fee
+     */
+    function getDisputeFee() 
+        public
+        returns(uint) 
+    {
+        uint _disputeFee= oracle.getStakeAmount()/10;
+        return _disputeFee;
+    } 
 
     /**
      * @dev Returns info on a dispute for a given ID
