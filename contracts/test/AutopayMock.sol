@@ -7,6 +7,8 @@ contract AutopayMock {
     IERC20 public token;
     mapping(address => uint256) public tipsByAddress;
 
+    event TIP(bytes32 _id, bytes _data);
+
     constructor(address _token) {
         token = IERC20(_token);
     }
@@ -18,6 +20,7 @@ contract AutopayMock {
     ) external {
         token.transferFrom(msg.sender, address(this), _amount);
         tipsByAddress[msg.sender] += _amount;
+        emit TIP(_queryId,_queryData);
     }
 
     function getTipsByAddress(address _user) public view returns (uint256) {

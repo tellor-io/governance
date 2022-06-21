@@ -3,14 +3,13 @@ pragma solidity 0.8.3;
 
 import "./TellorFlex.sol";
 import "usingtellor/contracts/UsingTellor.sol";
-
+import "hardhat/console.sol";
 
 /**
  @author Tellor Inc.
  @title Governance
  @dev This is a governance contract to be used with TellorFlex. It handles disputing
- * Tellor oracle data, proposing system parameter changes, and voting on those
- * disputes and proposals.
+ * Tellor oracle data and voting on those disputes
 */
 contract Governance is UsingTellor {
     // Storage
@@ -19,7 +18,6 @@ contract Governance is UsingTellor {
     address public oracleAddress; //tellorFlex address
     address public teamMultisig; // address of team multisig wallet, one of four stakeholder groups
     uint256 public voteCount; // total number of votes initiated
-
     bytes32 public autopayAddrsQueryId = keccak256(abi.encode("AutopayAddresses", abi.encode(bytes('')))); // query id for autopay addresses array
     mapping(uint256 => Dispute) private disputeInfo; // mapping of dispute IDs to the details of the dispute
     mapping(bytes32 => uint256) private openDisputesOnId; // mapping of a query ID to the number of disputes on that query ID
@@ -150,25 +148,22 @@ contract Governance is UsingTellor {
         _thisVote.blockNumber = block.number;
         _thisVote.startDate = block.timestamp;
         _thisVote.voteRound = voteRounds[_hash].length;
-       
-       uint _disputeFee = getDisputeFee();
-        // Calculate dispute fee based on number of current vote rounds
-        uint256 _fee;
+       uint256 _disputeFee = getDisputeFee();
+        // Calculate dispute fee based on number of current vote rounds 
         if (voteRounds[_hash].length == 1) {
-            _fee = _disputeFee * 2**(openDisputesOnId[_queryId] - 1);
+            _disputeFee = _disputeFee * 2**(openDisputesOnId[_queryId] - 1);
         } else {
-            _fee = _disputeFee * 2**(voteRounds[_hash].length - 1);
+            _disputeFee = _disputeFee * 2**(voteRounds[_hash].length - 1);
         }
-        if (_fee > oracle.stakeAmount()) {
-          _fee = oracle.stakeAmount();
+        if (_disputeFee > oracle.getStakeAmount()) {
+            console.log("stake");
+          _disputeFee = oracle.getStakeAmount();
         }
-        
-        _thisVote.fee = _fee;  
+        _thisVote.fee = _disputeFee;  
         require(
-            token.transferFrom(msg.sender, address(this), _fee),
+            token.transferFrom(msg.sender, address(this), _disputeFee),
             "Fee must be paid"
         ); // This is the dispute fee. Returned if dispute passes
-
         // The slashedAmount is set in TellorFlex.slashReporter function
         // It allows for slashing one stake per disputed value for the same reporter
         if (voteRounds[_hash].length == 1) {
@@ -210,9 +205,7 @@ contract Governance is UsingTellor {
             block.timestamp - _thisVote.tallyDate >=1 days, 
             "1 day has to pass after tally to allow for disputes"
         );
-
         _thisVote.executed = true;
-        
             Dispute storage _thisDispute = disputeInfo[_disputeId];
             if (
                 voteRounds[_thisVote.identifierHash].length ==
@@ -431,14 +424,9 @@ contract Governance is UsingTellor {
     /**
      * @dev Get the latest dispute fee
      */
-    function getDisputeFee() 
-        public
-        returns(uint) 
-    {
-        uint _disputeFee= oracle.getStakeAmount()/10;
-        return _disputeFee;
+    function getDisputeFee() public returns(uint256) {
+        return (oracle.getStakeAmount()/10);
     } 
-
     /**
      * @dev Returns info on a dispute for a given ID
      * @param _disputeId is the ID of a specific dispute
