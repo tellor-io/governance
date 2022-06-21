@@ -5,7 +5,6 @@ import "./interfaces/IERC20.sol";
 import "./interfaces/IGovernance.sol";
 import "hardhat/console.sol";
 
-
 /**
  @author Tellor Inc.
  @title TellorFlex
@@ -100,7 +99,7 @@ contract TellorFlex {
         owner = msg.sender;
         reportingLock = _reportingLock;
         stakeAmountDollarTarget = _stakeAmountDollarTarget;
-        stakeAmount = (_stakeAmountDollarTarget  * 10**18/ _priceTRB) * 1 ether;
+        stakeAmount = _stakeAmountDollarTarget * 10**18 / _priceTRB;
     }
 
     function init(address _governanceAddress) external {
@@ -704,13 +703,13 @@ contract TellorFlex {
     // *****************************************************************************
 
     function _updateStakeAmount() internal {
-        (bool valFound, bytes memory val, uint256 timestamp) = getDataBefore(
+        (bool valFound, bytes memory val,) = getDataBefore(
             trbUsdSpotPriceQueryId,
             block.timestamp - 12 hours
         );
         if (valFound) {
-            uint256 priceTRB = abi.decode(val, (uint256));
-            stakeAmount = (stakeAmountDollarTarget * 100**18 / priceTRB);
+            uint256 _priceTRB = abi.decode(val, (uint256));
+            stakeAmount = stakeAmountDollarTarget * 10**18 / _priceTRB;
             emit NewStakeAmount(stakeAmount);
         }
     }

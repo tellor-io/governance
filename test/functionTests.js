@@ -17,7 +17,7 @@ describe("Governance Function Tests", function() {
     await token.deployed();
     const Governance = await ethers.getContractFactory("Governance");
     const TellorFlex = await ethers.getContractFactory("TellorFlex")
-    flex = await TellorFlex.deploy(token.address, 86400/2,"100", web3.utils.toWei("10"))
+    flex = await TellorFlex.deploy(token.address, 86400/2, web3.utils.toWei("100"), web3.utils.toWei("10"))
     await flex.deployed();
     gov = await Governance.deploy(flex.address, accounts[0].address);
     await gov.deployed();
