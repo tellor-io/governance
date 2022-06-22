@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.3;
 
-import "./TellorFlex.sol";
+import "./ITellorFlex.sol";
 import "usingtellor/contracts/UsingTellor.sol";
 import "hardhat/console.sol";
 
@@ -13,7 +13,7 @@ import "hardhat/console.sol";
 */
 contract Governance is UsingTellor {
     // Storage
-    TellorFlex public oracle; // Tellor oracle contract
+    ITellorFlex public oracle; // Tellor oracle contract
     IERC20 public token; // token used for dispute fees, same as reporter staking token
     address public oracleAddress; //tellorFlex address
     address public teamMultisig; // address of team multisig wallet, one of four stakeholder groups
@@ -95,7 +95,7 @@ contract Governance is UsingTellor {
         address payable _tellor,
         address _teamMultisig
     ) UsingTellor(_tellor) {
-        oracle = TellorFlex(_tellor);
+        oracle = ITellorFlex(_tellor);
         token = oracle.token();
         oracleAddress = _tellor; 
         teamMultisig = _teamMultisig;
