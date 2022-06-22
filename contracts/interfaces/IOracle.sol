@@ -59,6 +59,16 @@ interface ITellorFlex {
         returns (address);
 
     /**
+     * @dev Returns the number of values submitted by a specific reporter address
+     * @param _reporter is the address of a reporter
+     * @return uint256 of the number of values submitted by the given reporter
+     */
+    function getReportsSubmittedByAddress(address _reporter)
+        external
+        view
+        returns (uint256);
+
+    /**
      * @dev Returns amount required to report oracle values
      * @return uint256 stake amount
      */
