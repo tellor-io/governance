@@ -89,7 +89,7 @@ interface ITellorFlex {
      * @param _queryId is the ID of the specific data feed
      * @return bytes memory of the current value of data
      */
-    function getCurrentValue(bytes32 _queryId);
+    function getCurrentValue(bytes32 _queryId) external view returns(bytes memory);
 
     /**
      * @dev Returns governance address
@@ -103,12 +103,9 @@ interface ITellorFlex {
      * @return uint256 count of the number of values received for the id
      */
     function getNewValueCountbyQueryId(bytes32 _queryId)
-        public
+        external
         view
-        returns (uint256)
-    {
-        return reports[_queryId].timestamps.length;
-    }
+        returns (uint256);
 
     /**
      * @dev Returns the pending staking reward for a given address
@@ -130,14 +127,7 @@ interface ITellorFlex {
     function getReportDetails(bytes32 _queryId, uint256 _timestamp)
         external
         view
-        returns (address, bool)
-    {
-        bool _wasRemoved = reports[_queryId].timestampIndex[_timestamp] == 0 &&
-            keccak256(reports[_queryId].valueByTimestamp[_timestamp]) ==
-            keccak256(bytes("")) &&
-            reports[_queryId].reporterByTimestamp[_timestamp] != address(0);
-        return (reports[_queryId].reporterByTimestamp[_timestamp], _wasRemoved);
-    }
+        returns (address, bool);
 
     /**
      * @dev Returns the address of the reporter who submitted a value for a data ID at a specific time
@@ -148,10 +138,7 @@ interface ITellorFlex {
     function getReporterByTimestamp(bytes32 _queryId, uint256 _timestamp)
         external
         view
-        returns (address)
-    {
-        return reports[_queryId].reporterByTimestamp[_timestamp];
-    }
+        returns (address);
 
     /**
      * @dev Returns the timestamp of the reporter's last submission
@@ -161,18 +148,13 @@ interface ITellorFlex {
     function getReporterLastTimestamp(address _reporter)
         external
         view
-        returns (uint256)
-    {
-        return stakerDetails[_reporter].reporterLastTimestamp;
-    }
+        returns (uint256);
 
     /**
      * @dev Returns the reporting lock time, the amount of time a reporter must wait to submit again
      * @return uint256 reporting lock time
      */
-    function getReportingLock() external view returns (uint256) {
-        return reportingLock;
-    }
+    function getReportingLock() external view returns (uint256);
 
     /**
      * @dev Returns the number of values submitted by a specific reporter address
@@ -182,11 +164,7 @@ interface ITellorFlex {
     function getReportsSubmittedByAddress(address _reporter)
         external
         view
-        returns (uint256)
-    {
-        return stakerDetails[_reporter].reportsSubmitted;
-    }
-
+        returns (uint256);
     /**
      * @dev Returns the number of values submitted to a specific queryId by a specific reporter address
      * @param _reporter is the address of a reporter
@@ -196,17 +174,13 @@ interface ITellorFlex {
     function getReportsSubmittedByAddressAndQueryId(
         address _reporter,
         bytes32 _queryId
-    ) external view returns (uint256) {
-        return stakerDetails[_reporter].reportsSubmittedByQueryId[_queryId];
-    }
+    ) external view returns (uint256);
 
     /**
      * @dev Returns amount required to report oracle values
      * @return uint256 stake amount
      */
-    function getStakeAmount() external view returns (uint256) {
-        return stakeAmount;
-    }
+    function getStakeAmount() external view returns (uint256);
 
     /**
      * @dev Allows users to retrieve all information about a staker
@@ -238,9 +212,7 @@ interface ITellorFlex {
      * @dev Returns the timestamp for the last value of any ID from the oracle
      * @return uint256 of timestamp of the last oracle value
      */
-    function getTimeOfLastNewValue() external view returns (uint256) {
-        return timeOfLastNewValue;
-    }
+    function getTimeOfLastNewValue() external view returns (uint256);
 
     /**
      * @dev Gets the timestamp for the value based on their index
@@ -249,7 +221,7 @@ interface ITellorFlex {
      * @return uint256 timestamp
      */
     function getTimestampbyQueryIdandIndex(bytes32 _queryId, uint256 _index)
-        public
+        external
         view
         returns (uint256);
 
@@ -262,7 +234,7 @@ interface ITellorFlex {
      */
     // slither-disable-next-line calls-loop
     function getIndexForDataBefore(bytes32 _queryId, uint256 _timestamp)
-        public
+        external
         view
         returns (bool _found, uint256 _index);
 
@@ -286,7 +258,7 @@ interface ITellorFlex {
      * @return _timestampRetrieved the value's timestamp
      */
     function getDataBefore(bytes32 _queryId, uint256 _timestamp)
-        public
+        external
         view
         returns (
             bool _ifRetrieve,
@@ -313,7 +285,7 @@ interface ITellorFlex {
      * @return bytes value for timestamp submitted
      */
     function retrieveData(bytes32 _queryId, uint256 _timestamp)
-        public
+        external
         view
         returns (bytes memory);
 

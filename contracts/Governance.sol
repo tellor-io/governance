@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.3;
 
-import "./ITellorFlex.sol";
+import "./interfaces/ITellorFlex.sol";
+import "./interfaces/IERC20.sol";
 import "usingtellor/contracts/UsingTellor.sol";
 import "hardhat/console.sol";
 
@@ -96,7 +97,7 @@ contract Governance is UsingTellor {
         address _teamMultisig
     ) UsingTellor(_tellor) {
         oracle = ITellorFlex(_tellor);
-        token = oracle.token();
+        token = IERC20(oracle.getTokenAddress());
         oracleAddress = _tellor; 
         teamMultisig = _teamMultisig;
     }
