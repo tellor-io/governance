@@ -14,7 +14,7 @@ import "hardhat/console.sol";
 */
 contract Governance is UsingTellor {
     // Storage
-    ITellorFlex public oracle; // Tellor oracle contract
+    IOracle public oracle; // Tellor oracle contract
     IERC20 public token; // token used for dispute fees, same as reporter staking token
     address public oracleAddress; //tellorFlex address
     address public teamMultisig; // address of team multisig wallet, one of four stakeholder groups
@@ -96,7 +96,7 @@ contract Governance is UsingTellor {
         address payable _tellor,
         address _teamMultisig
     ) UsingTellor(_tellor) {
-        oracle = ITellorFlex(_tellor);
+        oracle = IOracle(_tellor);
         token = IERC20(oracle.getTokenAddress());
         oracleAddress = _tellor; 
         teamMultisig = _teamMultisig;

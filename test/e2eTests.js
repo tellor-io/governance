@@ -22,12 +22,9 @@ describe("Governance End-To-End Tests", function() {
     await token.deployed();
     const Governance = await ethers.getContractFactory("Governance");
     const TellorFlex = await ethers.getContractFactory("TellorFlex")
-    console.log(1)
     flex = await TellorFlex.deploy(token.address, 86400/2, web3.utils.toWei("100"), web3.utils.toWei("10"))
-    console.log(2)
     await flex.deployed();
     gov = await Governance.deploy(flex.address,  accounts[0].address);
-    console.log(3)
     await gov.deployed();
     await flex.init(gov.address)
     const Autopay = await ethers.getContractFactory("AutopayMock");

@@ -9,7 +9,7 @@ pragma solidity 0.8.3;
  * by a single address known as 'governance', which could be an externally owned
  * account or a contract, allowing for a flexible, modular design.
 */
-interface ITellorFlex {
+interface IOracle {
 
     /**
      * @dev Removes a value from the oracle.
