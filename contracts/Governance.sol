@@ -425,7 +425,7 @@ contract Governance is UsingTellor {
     /**
      * @dev Get the latest dispute fee
      */
-    function getDisputeFee() public returns(uint256) {
+    function getDisputeFee() public view returns(uint256) {
         return (oracle.getStakeAmount()/10);
     } 
     /**
