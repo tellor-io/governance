@@ -269,5 +269,27 @@ describe("Governance End-To-End Tests", function() {
     assert(voteInfo[1][15] == 0, "Multisig against should be correct")
     assert(voteInfo[1][16] == 0, "Multisig invalid should be correct")
     assert(voteInfo[3] == 1, "Vote result should be correct")
+  });
+  it("Test query id value after a dispute", async () => {
+    await token.connect(accounts[1]).approve(flex.address, web3.utils.toWei("10"))
+    await flex.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
+    await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("100"))
+    // there should be no previous value
+    await h.expectThrow(flex.getCurrentValue(QUERYID1))
+    // submit first value
+    await flex.connect(accounts[1]).submitValue(QUERYID1, h.bytes(200), 0, '0x')
+    blocky = await h.getBlock()
+    assert(await flex.getCurrentValue(QUERYID1) == h.bytes(200), "Current value should be most recent report")
+    // bypass reporter lock
+    h.advanceTime(43200)
+    await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("10"))
+    // 'Dispute must be started within reporting lock time'
+    await h.expectThrow(gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp))
+    await flex.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    assert(await flex.getCurrentValue(QUERYID1) == h.bytes(100), "Current value should be most recent report")
+    blocky = await h.getBlock()
+    await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("10"))
+    await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
+    assert(await flex.getCurrentValue(QUERYID1) == h.bytes(200), "Current value shouldn't be dispute value");
   })
 })
