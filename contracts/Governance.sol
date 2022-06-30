@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.3;
 
-import "./TellorFlex.sol";
+import "./interfaces/IOracle.sol";
+import "./interfaces/IERC20.sol";
 import "usingtellor/contracts/UsingTellor.sol";
 import "hardhat/console.sol";
 
@@ -13,7 +14,7 @@ import "hardhat/console.sol";
 */
 contract Governance is UsingTellor {
     // Storage
-    TellorFlex public oracle; // Tellor oracle contract
+    IOracle public oracle; // Tellor oracle contract
     IERC20 public token; // token used for dispute fees, same as reporter staking token
     address public oracleAddress; //tellorFlex address
     address public teamMultisig; // address of team multisig wallet, one of four stakeholder groups
@@ -95,8 +96,8 @@ contract Governance is UsingTellor {
     constructor(address payable _tellor, address _teamMultisig)
         UsingTellor(_tellor)
     {
-        oracle = TellorFlex(_tellor);
-        token = oracle.token();
+        oracle = IOracle(_tellor);
+        token = IERC20(oracle.getTokenAddress());
         oracleAddress = _tellor;
         teamMultisig = _teamMultisig;
     }
@@ -426,7 +427,7 @@ contract Governance is UsingTellor {
     /**
      * @dev Get the latest dispute fee
      */
-    function getDisputeFee() public returns (uint256) {
+    function getDisputeFee() public view returns (uint256) {
         return (oracle.getStakeAmount() / 10);
     }
 

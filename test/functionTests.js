@@ -29,7 +29,7 @@ describe("Governance Function Tests", function() {
   });
   it("Test Constructor()", async function() {
     assert(await gov.tellor() == flex.address, "tellor address should be correct")
-    //???assert(await gov.disputeFee() == web3.utils.toWei("10"), "min dispute fee should be set properly")
+    assert(await gov.getDisputeFee() == await flex.getStakeAmount()/10, "min dispute fee should be set properly")
     assert(await gov.teamMultisig() == accounts[0].address, "team multisig should be set correctly")
   });
   it("Test beginDispute()", async function() {
@@ -55,7 +55,7 @@ describe("Governance Function Tests", function() {
     assert(vars[3] == accounts[1].address, "accounts[1] should be correct")
     assert(await gov.getOpenDisputesOnId(QUERYID1) == 1, "open disputes on ID should be correct")
     assert(await gov.getVoteRounds(_hash) == 1, "number of vote rounds should be correct")
-    //???assert(balance1 - balance2 - web3.utils.toWei("10") == 0, "dispute fee paid should be correct")
+    assert(balance1 - balance2 - (await flex.getStakeAmount()/10) == 0, "dispute fee paid should be correct")
     await h.advanceTime(86400 * 2);
     await gov.tallyVotes(1)
     await h.advanceTime(86400 * 2);
@@ -338,5 +338,28 @@ describe("Governance Function Tests", function() {
     assert(await gov.getVoteTallyByAddress(accounts[1].address) == 1, "Vote tally should be correct")
     await gov.connect(accounts[1]).vote(2, true, false)
     assert(await gov.getVoteTallyByAddress(accounts[1].address) == 2, "Vote tally should be correct")
+  })
+  it("Test _getUserTips", async function() {
+    let userAccount = accounts[1]
+    await token.connect(userAccount).transfer(accounts[2].address, web3.utils.toWei("20"))
+    await token.connect(accounts[2]).approve(flex.address, web3.utils.toWei("20"))
+    await flex.connect(accounts[2]).depositStake(web3.utils.toWei("20"))
+    // submit autopay address[] to oracle
+    await flex.connect(accounts[2]).submitValue(autopayQueryId, autopayArray, 0, autopayQueryData)
+    h.advanceTime(43200)
+    await token.connect(userAccount).approve(autopay.address, web3.utils.toWei("20"))
+    await autopay.connect(userAccount).tip(QUERYID1,web3.utils.toWei("20"),h.bytes(100))
+    await flex.connect(accounts[2]).submitValue(h.uintTob32(1), h.uintTob32(100), 0, '0x')
+    blocky = await h.getBlock()
+    await token.connect(userAccount).approve(gov.address, web3.utils.toWei("10"))
+    await gov.connect(userAccount).beginDispute(h.uintTob32(1), blocky.timestamp)
+    await gov.connect(userAccount).vote(1, true, false)
+    await h.advanceTime(86400 * 7)
+    await gov.connect(userAccount).tallyVotes(1)
+    await h.advanceTime(86400)
+    await gov.executeVote(1)
+    voteInfo = await gov.getVoteInfo(1)
+    // user weight based on tip amount
+    assert(voteInfo[1][8] == web3.utils.toWei("20"), "Vote users doesSupport weight should be based on tip total")
   })
 });
