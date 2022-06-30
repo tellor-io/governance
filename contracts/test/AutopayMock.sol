@@ -20,7 +20,7 @@ contract AutopayMock {
     ) external {
         token.transferFrom(msg.sender, address(this), _amount);
         tipsByAddress[msg.sender] += _amount;
-        emit TIP(_queryId,_queryData);
+        emit TIP(_queryId, _queryData);
     }
 
     function getTipsByAddress(address _user) public view returns (uint256) {

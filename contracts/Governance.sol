@@ -18,7 +18,8 @@ contract Governance is UsingTellor {
     address public oracleAddress; //tellorFlex address
     address public teamMultisig; // address of team multisig wallet, one of four stakeholder groups
     uint256 public voteCount; // total number of votes initiated
-    bytes32 public autopayAddrsQueryId = keccak256(abi.encode("AutopayAddresses", abi.encode(bytes('')))); // query id for autopay addresses array
+    bytes32 public autopayAddrsQueryId =
+        keccak256(abi.encode("AutopayAddresses", abi.encode(bytes("")))); // query id for autopay addresses array
     mapping(uint256 => Dispute) private disputeInfo; // mapping of dispute IDs to the details of the dispute
     mapping(bytes32 => uint256) private openDisputesOnId; // mapping of a query ID to the number of disputes on that query ID
     mapping(uint256 => Vote) private voteInfo; // mapping of dispute IDs to the details of the vote
@@ -91,13 +92,12 @@ contract Governance is UsingTellor {
      * @param _teamMultisig address of tellor team multisig, one of four voting
      * stakeholder groups
      */
-    constructor(
-        address payable _tellor,
-        address _teamMultisig
-    ) UsingTellor(_tellor) {
+    constructor(address payable _tellor, address _teamMultisig)
+        UsingTellor(_tellor)
+    {
         oracle = TellorFlex(_tellor);
         token = oracle.token();
-        oracleAddress = _tellor; 
+        oracleAddress = _tellor;
         teamMultisig = _teamMultisig;
     }
 
@@ -148,8 +148,8 @@ contract Governance is UsingTellor {
         _thisVote.blockNumber = block.number;
         _thisVote.startDate = block.timestamp;
         _thisVote.voteRound = voteRounds[_hash].length;
-       uint256 _disputeFee = getDisputeFee();
-        // Calculate dispute fee based on number of current vote rounds 
+        uint256 _disputeFee = getDisputeFee();
+        // Calculate dispute fee based on number of current vote rounds
         if (voteRounds[_hash].length == 1) {
             _disputeFee = _disputeFee * 2**(openDisputesOnId[_queryId] - 1);
         } else {
@@ -157,9 +157,9 @@ contract Governance is UsingTellor {
         }
         if (_disputeFee > oracle.getStakeAmount()) {
             console.log("stake");
-          _disputeFee = oracle.getStakeAmount();
+            _disputeFee = oracle.getStakeAmount();
         }
-        _thisVote.fee = _disputeFee;  
+        _thisVote.fee = _disputeFee;
         require(
             token.transferFrom(msg.sender, address(this), _disputeFee),
             "Fee must be paid"
@@ -174,7 +174,7 @@ contract Governance is UsingTellor {
             oracle.removeValue(_queryId, _timestamp);
         } else {
             _thisDispute.slashedAmount = disputeInfo[voteRounds[_hash][0]]
-                .slashedAmount;  
+                .slashedAmount;
         }
         emit NewDispute(
             _disputeId,
@@ -202,70 +202,68 @@ contract Governance is UsingTellor {
         );
         //The time  has to pass after the vote is tallied
         require(
-            block.timestamp - _thisVote.tallyDate >=1 days, 
+            block.timestamp - _thisVote.tallyDate >= 1 days,
             "1 day has to pass after tally to allow for disputes"
         );
         _thisVote.executed = true;
-            Dispute storage _thisDispute = disputeInfo[_disputeId];
-            if (
-                voteRounds[_thisVote.identifierHash].length ==
-                _thisVote.voteRound
+        Dispute storage _thisDispute = disputeInfo[_disputeId];
+        if (
+            voteRounds[_thisVote.identifierHash].length == _thisVote.voteRound
+        ) {
+            openDisputesOnId[_thisDispute.queryId]--;
+        }
+        uint256 _i;
+        uint256 _voteID;
+        if (_thisVote.result == VoteResult.PASSED) {
+            // If vote is in dispute and passed, iterate through each vote round and transfer the dispute to initiator
+            for (
+                _i = voteRounds[_thisVote.identifierHash].length;
+                _i > 0;
+                _i--
             ) {
-                openDisputesOnId[_thisDispute.queryId]--;
+                _voteID = voteRounds[_thisVote.identifierHash][_i - 1];
+                _thisVote = voteInfo[_voteID];
+                // If the first vote round, also make sure to transfer the reporter's slashed stake to the initiator
+                if (_i == 1) {
+                    token.transfer(
+                        _thisVote.initiator,
+                        _thisDispute.slashedAmount
+                    );
+                }
+                token.transfer(_thisVote.initiator, _thisVote.fee);
             }
-            uint256 _i;
-            uint256 _voteID;
-            if (_thisVote.result == VoteResult.PASSED) {
-                // If vote is in dispute and passed, iterate through each vote round and transfer the dispute to initiator
-                for (
-                    _i = voteRounds[_thisVote.identifierHash].length;
-                    _i > 0;
-                    _i--
-                ) {
-                    _voteID = voteRounds[_thisVote.identifierHash][_i - 1];
-                    _thisVote = voteInfo[_voteID];
-                    // If the first vote round, also make sure to transfer the reporter's slashed stake to the initiator
-                    if (_i == 1) {
-                        token.transfer(
-                            _thisVote.initiator,
-                            _thisDispute.slashedAmount
-                        );
-                    }
-                    token.transfer(_thisVote.initiator, _thisVote.fee);
-                }
-            } else if (_thisVote.result == VoteResult.INVALID) {
-                // If vote is in dispute and is invalid, iterate through each vote round and transfer the dispute fee to initiator
-                for (
-                    _i = voteRounds[_thisVote.identifierHash].length;
-                    _i > 0;
-                    _i--
-                ) {
-                    _voteID = voteRounds[_thisVote.identifierHash][_i - 1];
-                    _thisVote = voteInfo[_voteID];
-                    token.transfer(_thisVote.initiator, _thisVote.fee);
-                }
-                // Transfer slashed tokens back to disputed reporter
-                token.transfer(
-                    _thisDispute.disputedReporter,
-                    _thisDispute.slashedAmount
-                );
-            } else if (_thisVote.result == VoteResult.FAILED) {
-                // If vote is in dispute and fails, iterate through each vote round and transfer the dispute fee to disputed reporter
-                uint256 _reporterReward = 0;
-                for (
-                    _i = voteRounds[_thisVote.identifierHash].length;
-                    _i > 0;
-                    _i--
-                ) {
-                    _voteID = voteRounds[_thisVote.identifierHash][_i - 1];
-                    _thisVote = voteInfo[_voteID];
-                    _reporterReward += _thisVote.fee;
-                }
-                _reporterReward += _thisDispute.slashedAmount;
-                token.transfer(_thisDispute.disputedReporter, _reporterReward);
+        } else if (_thisVote.result == VoteResult.INVALID) {
+            // If vote is in dispute and is invalid, iterate through each vote round and transfer the dispute fee to initiator
+            for (
+                _i = voteRounds[_thisVote.identifierHash].length;
+                _i > 0;
+                _i--
+            ) {
+                _voteID = voteRounds[_thisVote.identifierHash][_i - 1];
+                _thisVote = voteInfo[_voteID];
+                token.transfer(_thisVote.initiator, _thisVote.fee);
             }
-            emit VoteExecuted(_disputeId, voteInfo[_disputeId].result);
-        
+            // Transfer slashed tokens back to disputed reporter
+            token.transfer(
+                _thisDispute.disputedReporter,
+                _thisDispute.slashedAmount
+            );
+        } else if (_thisVote.result == VoteResult.FAILED) {
+            // If vote is in dispute and fails, iterate through each vote round and transfer the dispute fee to disputed reporter
+            uint256 _reporterReward = 0;
+            for (
+                _i = voteRounds[_thisVote.identifierHash].length;
+                _i > 0;
+                _i--
+            ) {
+                _voteID = voteRounds[_thisVote.identifierHash][_i - 1];
+                _thisVote = voteInfo[_voteID];
+                _reporterReward += _thisVote.fee;
+            }
+            _reporterReward += _thisDispute.slashedAmount;
+            token.transfer(_thisDispute.disputedReporter, _reporterReward);
+        }
+        emit VoteExecuted(_disputeId, voteInfo[_disputeId].result);
     }
 
     /**
@@ -282,7 +280,8 @@ contract Governance is UsingTellor {
         // Vote time increases as rounds increase but only up to 6 days (withdrawal period)
         require(
             block.timestamp - _thisVote.startDate >=
-                86400 * _thisVote.voteRound || block.timestamp - _thisVote.startDate >= 86400 * 6,
+                86400 * _thisVote.voteRound ||
+                block.timestamp - _thisVote.startDate >= 86400 * 6,
             "Time for voting has not elapsed"
         );
         // Get total votes from each separate stakeholder group.  This will allow
@@ -313,7 +312,7 @@ contract Governance is UsingTellor {
         if (usersVoteSum == 0) {
             usersVoteSum++;
         }
-        
+
         // Normalize and combine each stakeholder group votes
         uint256 scaledDoesSupport = ((_thisVote.tokenholders.doesSupport *
             10000) / tokenVoteSum) +
@@ -332,8 +331,7 @@ contract Governance is UsingTellor {
             ((_thisVote.users.invalidQuery * 10000) / multisigVoteSum);
         // If there are more invalid votes than for and against, result is invalid
         if (
-            scaledInvalid >= scaledDoesSupport &&
-            scaledInvalid >= scaledAgainst 
+            scaledInvalid >= scaledDoesSupport && scaledInvalid >= scaledAgainst
         ) {
             _thisVote.result = VoteResult.INVALID;
         } else if (scaledDoesSupport > scaledAgainst) {
@@ -377,21 +375,25 @@ contract Governance is UsingTellor {
         _tokenBalance += stakedBalance + lockedBalance;
         if (_invalidQuery) {
             _thisVote.tokenholders.invalidQuery += _tokenBalance;
-            _thisVote.reporters.invalidQuery += oracle.getReportsSubmittedByAddress(msg.sender);
+            _thisVote.reporters.invalidQuery += oracle
+                .getReportsSubmittedByAddress(msg.sender);
             _thisVote.users.invalidQuery += _getUserTips(msg.sender);
             if (msg.sender == teamMultisig) {
                 _thisVote.teamMultisig.invalidQuery += 1;
             }
         } else if (_supports) {
             _thisVote.tokenholders.doesSupport += _tokenBalance;
-            _thisVote.reporters.doesSupport += oracle.getReportsSubmittedByAddress(msg.sender);
+            _thisVote.reporters.doesSupport += oracle
+                .getReportsSubmittedByAddress(msg.sender);
             _thisVote.users.doesSupport += _getUserTips(msg.sender);
             if (msg.sender == teamMultisig) {
                 _thisVote.teamMultisig.doesSupport += 1;
             }
         } else {
             _thisVote.tokenholders.against += _tokenBalance;
-            _thisVote.reporters.against += oracle.getReportsSubmittedByAddress(msg.sender);
+            _thisVote.reporters.against += oracle.getReportsSubmittedByAddress(
+                msg.sender
+            );
             _thisVote.users.against += _getUserTips(msg.sender);
             if (msg.sender == teamMultisig) {
                 _thisVote.teamMultisig.against += 1;
@@ -424,9 +426,10 @@ contract Governance is UsingTellor {
     /**
      * @dev Get the latest dispute fee
      */
-    function getDisputeFee() public returns(uint256) {
-        return (oracle.getStakeAmount()/10);
-    } 
+    function getDisputeFee() public returns (uint256) {
+        return (oracle.getStakeAmount() / 10);
+    }
+
     /**
      * @dev Returns info on a dispute for a given ID
      * @param _disputeId is the ID of a specific dispute
@@ -485,9 +488,9 @@ contract Governance is UsingTellor {
         returns (
             bytes32,
             uint256[17] memory,
-            bool ,
+            bool,
             VoteResult,
-            address 
+            address
         )
     {
         Vote storage _v = voteInfo[_disputeId];
@@ -552,16 +555,26 @@ contract Governance is UsingTellor {
      */
     function _getUserTips(address _user) internal returns (uint256) {
         // get autopay addresses array from oracle
-        (, bytes memory _autopayAddrsBytes, uint256 _timestamp) = getDataBefore(autopayAddrsQueryId, block.timestamp - 12 hours);
-        if(_timestamp > 0) {
-            address[] memory _autopayAddrs = abi.decode(_autopayAddrsBytes, (address[]));
+        (, bytes memory _autopayAddrsBytes, uint256 _timestamp) = getDataBefore(
+            autopayAddrsQueryId,
+            block.timestamp - 12 hours
+        );
+        if (_timestamp > 0) {
+            address[] memory _autopayAddrs = abi.decode(
+                _autopayAddrsBytes,
+                (address[])
+            );
             uint256 _userTipTally;
             // iterate through autopay addresses retrieve tips by user address
-            for(uint256 _i=0; _i<_autopayAddrs.length; _i++) {
-                (bool _success, bytes memory _returnData) = _autopayAddrs[_i].call(
-                    abi.encodeWithSignature("getTipsByAddress(address)", _user)   
-                );
-                if(_success) {
+            for (uint256 _i = 0; _i < _autopayAddrs.length; _i++) {
+                (bool _success, bytes memory _returnData) = _autopayAddrs[_i]
+                    .call(
+                        abi.encodeWithSignature(
+                            "getTipsByAddress(address)",
+                            _user
+                        )
+                    );
+                if (_success) {
                     _userTipTally += abi.decode(_returnData, (uint256));
                 }
             }
