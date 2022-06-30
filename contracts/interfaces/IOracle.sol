@@ -10,7 +10,6 @@ pragma solidity 0.8.3;
  * account or a contract, allowing for a flexible, modular design.
 */
 interface IOracle {
-
     /**
      * @dev Removes a value from the oracle.
      * Note: this function is only callable by the Governance contract.
@@ -133,5 +132,4 @@ interface IOracle {
         external
         view
         returns (bytes memory);
-
 }
