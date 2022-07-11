@@ -4,7 +4,6 @@ pragma solidity 0.8.3;
 import "./interfaces/IOracle.sol";
 import "./interfaces/IERC20.sol";
 import "usingtellor/contracts/UsingTellor.sol";
-import "hardhat/console.sol";
 
 /**
  @author Tellor Inc.
@@ -103,7 +102,7 @@ contract Governance is UsingTellor {
     }
 
     /**
-     * @dev Helps initialize a dispute by assigning it a disputeId
+     * @dev Initializes a dispute/vote in the system
      * @param _queryId being disputed
      * @param _timestamp being disputed
      */
@@ -157,7 +156,6 @@ contract Governance is UsingTellor {
             _disputeFee = _disputeFee * 2**(voteRounds[_hash].length - 1);
         }
         if (_disputeFee > oracle.getStakeAmount()) {
-            console.log("stake");
             _disputeFee = oracle.getStakeAmount();
         }
         _thisVote.fee = _disputeFee;
@@ -186,8 +184,7 @@ contract Governance is UsingTellor {
     }
 
     /**
-     * @dev Executes vote by using result and transferring balance to either
-     * initiator or disputed reporter
+     * @dev Executes vote and transfers corresponding balances to initiator/reporter
      * @param _disputeId is the ID of the vote being executed
      */
     function executeVote(uint256 _disputeId) external {
@@ -208,11 +205,7 @@ contract Governance is UsingTellor {
         );
         _thisVote.executed = true;
         Dispute storage _thisDispute = disputeInfo[_disputeId];
-        if (
-            voteRounds[_thisVote.identifierHash].length == _thisVote.voteRound
-        ) {
-            openDisputesOnId[_thisDispute.queryId]--;
-        }
+        openDisputesOnId[_thisDispute.queryId]--;
         uint256 _i;
         uint256 _voteID;
         if (_thisVote.result == VoteResult.PASSED) {
@@ -274,7 +267,6 @@ contract Governance is UsingTellor {
     function tallyVotes(uint256 _disputeId) external {
         // Ensure vote has not been executed and that vote has not been tallied
         Vote storage _thisVote = voteInfo[_disputeId];
-        require(!_thisVote.executed, "Dispute has already been executed");
         require(_thisVote.tallyDate == 0, "Vote has already been tallied");
         require(_disputeId <= voteCount, "Vote does not exist");
         // Determine appropriate vote duration dispute round
@@ -288,54 +280,53 @@ contract Governance is UsingTellor {
         // Get total votes from each separate stakeholder group.  This will allow
         // normalization so each group's votes can be combined and compared to
         // determine the vote outcome.
-        uint256 tokenVoteSum = _thisVote.tokenholders.doesSupport +
+        uint256 _tokenVoteSum = _thisVote.tokenholders.doesSupport +
             _thisVote.tokenholders.against +
             _thisVote.tokenholders.invalidQuery;
-        uint256 reportersVoteSum = _thisVote.reporters.doesSupport +
+        uint256 _reportersVoteSum = _thisVote.reporters.doesSupport +
             _thisVote.reporters.against +
             _thisVote.reporters.invalidQuery;
-        uint256 multisigVoteSum = _thisVote.teamMultisig.doesSupport +
+        uint256 _multisigVoteSum = _thisVote.teamMultisig.doesSupport +
             _thisVote.teamMultisig.against +
             _thisVote.teamMultisig.invalidQuery;
-        uint256 usersVoteSum = _thisVote.users.doesSupport +
+        uint256 _usersVoteSum = _thisVote.users.doesSupport +
             _thisVote.users.against +
             _thisVote.users.invalidQuery;
         // Cannot divide by zero
-        if (tokenVoteSum == 0) {
-            tokenVoteSum++;
+        if (_tokenVoteSum == 0) {
+            _tokenVoteSum++;
         }
-        if (reportersVoteSum == 0) {
-            reportersVoteSum++;
+        if (_reportersVoteSum == 0) {
+            _reportersVoteSum++;
         }
-        if (multisigVoteSum == 0) {
-            multisigVoteSum++;
+        if (_multisigVoteSum == 0) {
+            _multisigVoteSum++;
         }
-        if (usersVoteSum == 0) {
-            usersVoteSum++;
+        if (_usersVoteSum == 0) {
+            _usersVoteSum++;
         }
-
         // Normalize and combine each stakeholder group votes
-        uint256 scaledDoesSupport = ((_thisVote.tokenholders.doesSupport *
-            10000) / tokenVoteSum) +
-            ((_thisVote.reporters.doesSupport * 10000) / reportersVoteSum) +
-            ((_thisVote.teamMultisig.doesSupport * 10000) / multisigVoteSum) +
-            ((_thisVote.users.doesSupport * 10000) / multisigVoteSum);
-        uint256 scaledAgainst = ((_thisVote.tokenholders.against * 10000) /
-            tokenVoteSum) +
-            ((_thisVote.reporters.against * 10000) / reportersVoteSum) +
-            ((_thisVote.teamMultisig.against * 10000) / multisigVoteSum) +
-            ((_thisVote.users.against * 10000) / multisigVoteSum);
-        uint256 scaledInvalid = ((_thisVote.tokenholders.invalidQuery * 10000) /
-            tokenVoteSum) +
-            ((_thisVote.reporters.invalidQuery * 10000) / reportersVoteSum) +
-            ((_thisVote.teamMultisig.invalidQuery * 10000) / multisigVoteSum) +
-            ((_thisVote.users.invalidQuery * 10000) / multisigVoteSum);
+        uint256 _scaledDoesSupport = ((_thisVote.tokenholders.doesSupport *
+            10000) / _tokenVoteSum) +
+            ((_thisVote.reporters.doesSupport * 10000) / _reportersVoteSum) +
+            ((_thisVote.teamMultisig.doesSupport * 10000) / _multisigVoteSum) +
+            ((_thisVote.users.doesSupport * 10000) / _multisigVoteSum);
+        uint256 _scaledAgainst = ((_thisVote.tokenholders.against * 10000) /
+            _tokenVoteSum) +
+            ((_thisVote.reporters.against * 10000) / _reportersVoteSum) +
+            ((_thisVote.teamMultisig.against * 10000) / _multisigVoteSum) +
+            ((_thisVote.users.against * 10000) / _multisigVoteSum);
+        uint256 _scaledInvalid = ((_thisVote.tokenholders.invalidQuery * 10000) /
+            _tokenVoteSum) +
+            ((_thisVote.reporters.invalidQuery * 10000) / _reportersVoteSum) +
+            ((_thisVote.teamMultisig.invalidQuery * 10000) / _multisigVoteSum) +
+            ((_thisVote.users.invalidQuery * 10000) / _multisigVoteSum);
         // If there are more invalid votes than for and against, result is invalid
         if (
-            scaledInvalid >= scaledDoesSupport && scaledInvalid >= scaledAgainst
+            _scaledInvalid >= _scaledDoesSupport && _scaledInvalid >= _scaledAgainst
         ) {
             _thisVote.result = VoteResult.INVALID;
-        } else if (scaledDoesSupport > scaledAgainst) {
+        } else if (_scaledDoesSupport > _scaledAgainst) {
             // If there are more support votes than against votes, allow the vote to pass
             _thisVote.result = VoteResult.PASSED;
         }
@@ -371,9 +362,8 @@ contract Governance is UsingTellor {
         // Update voting status and increment total queries for support, invalid, or against based on vote
         _thisVote.voted[msg.sender] = true;
         uint256 _tokenBalance = token.balanceOf(msg.sender);
-        (, uint256 stakedBalance, uint256 lockedBalance, , , , , ) = oracle
-            .getStakerInfo(msg.sender);
-        _tokenBalance += stakedBalance + lockedBalance;
+        (, uint256 _stakedBalance, uint256 _lockedBalance, , , , , ) = oracle.getStakerInfo(msg.sender);
+        _tokenBalance += _stakedBalance + _lockedBalance;
         if (_invalidQuery) {
             _thisVote.tokenholders.invalidQuery += _tokenBalance;
             _thisVote.reporters.invalidQuery += oracle
@@ -384,8 +374,7 @@ contract Governance is UsingTellor {
             }
         } else if (_supports) {
             _thisVote.tokenholders.doesSupport += _tokenBalance;
-            _thisVote.reporters.doesSupport += oracle
-                .getReportsSubmittedByAddress(msg.sender);
+            _thisVote.reporters.doesSupport += oracle.getReportsSubmittedByAddress(msg.sender);
             _thisVote.users.doesSupport += _getUserTips(msg.sender);
             if (msg.sender == teamMultisig) {
                 _thisVote.teamMultisig.doesSupport += 1;
@@ -478,8 +467,8 @@ contract Governance is UsingTellor {
      * @dev Returns info on a vote for a given vote ID
      * @param _disputeId is the ID of a specific vote
      * @return bytes32 identifier hash of the vote
-     * @return uint256[8] memory of the pertinent round info (vote rounds, start date, fee, etc.)
-     * @return bool[2] memory of both whether or not the vote was executed and is dispute
+     * @return uint256[17] memory of the pertinent round info (vote rounds, start date, fee, etc.)
+     * @return bool memory of both whether or not the vote was executed
      * @return VoteResult result of the vote
      * @return address memory of the vote initiator
      */
@@ -552,9 +541,9 @@ contract Governance is UsingTellor {
     /**
      * @dev Retrieves total tips contributed to autopay by a given address
      * @param _user address of the user to check the tip count for
-     * @return uint256 total tips contributed to autopay by the address
+     * @return _userTipTally uint256 of total tips contributed to autopay by the address
      */
-    function _getUserTips(address _user) internal returns (uint256) {
+    function _getUserTips(address _user) internal returns (uint256 _userTipTally) {
         // get autopay addresses array from oracle
         (, bytes memory _autopayAddrsBytes, uint256 _timestamp) = getDataBefore(
             autopayAddrsQueryId,
@@ -565,7 +554,6 @@ contract Governance is UsingTellor {
                 _autopayAddrsBytes,
                 (address[])
             );
-            uint256 _userTipTally;
             // iterate through autopay addresses retrieve tips by user address
             for (uint256 _i = 0; _i < _autopayAddrs.length; _i++) {
                 (bool _success, bytes memory _returnData) = _autopayAddrs[_i]
@@ -579,9 +567,6 @@ contract Governance is UsingTellor {
                     _userTipTally += abi.decode(_returnData, (uint256));
                 }
             }
-            return _userTipTally;
-        } else {
-            return 0;
         }
     }
 }
