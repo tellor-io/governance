@@ -5,6 +5,9 @@ const QUERYID1 = h.uintTob32(1)
 const abiCoder = new ethers.utils.AbiCoder
 const autopayQueryData = abiCoder.encode(["string", "bytes"], ["AutopayAddresses", abiCoder.encode(['bytes'], ['0x'])])
 const autopayQueryId = ethers.utils.keccak256(autopayQueryData)
+const TRB_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["trb", "usd"])
+const TRB_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", TRB_QUERY_DATA_ARGS])
+const TRB_QUERY_ID = ethers.utils.keccak256(TRB_QUERY_DATA)
 
 describe("Governance Function Tests", function() {
 
@@ -17,7 +20,7 @@ describe("Governance Function Tests", function() {
     await token.deployed();
     const Governance = await ethers.getContractFactory("Governance");
     const TellorFlex = await ethers.getContractFactory("TellorFlex")
-    flex = await TellorFlex.deploy(token.address, 86400/2, web3.utils.toWei("100"), web3.utils.toWei("10"))
+    flex = await TellorFlex.deploy(token.address, 86400/2, web3.utils.toWei("100"), web3.utils.toWei("10"),TRB_QUERY_ID)
     await flex.deployed();
     gov = await Governance.deploy(flex.address, accounts[0].address);
     await gov.deployed();
@@ -29,6 +32,8 @@ describe("Governance Function Tests", function() {
   });
   it("Test Constructor()", async function() {
     assert(await gov.tellor() == flex.address, "tellor address should be correct")
+    assert(await gov.oracle() == flex.address, "oracle address should be set")
+    assert(await gov.token() == token.address, "token address should be set")
     assert(await gov.getDisputeFee() == await flex.getStakeAmount()/10, "min dispute fee should be set properly")
     assert(await gov.teamMultisig() == accounts[0].address, "team multisig should be set correctly")
   });
@@ -48,11 +53,14 @@ describe("Governance Function Tests", function() {
     await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp);
     let balance2 = await token.balanceOf(accounts[2].address)
     let vars = await gov.getDisputeInfo(1)
+    let vars2 = await gov.getVoteInfo(1)
     let _hash = ethers.utils.solidityKeccak256(['bytes32', 'uint256'], [h.uintTob32(1), blocky.timestamp])
+    assert(await gov.getVoteCount() == 1, "vote count should be correct")
     assert(vars[0] == QUERYID1, "queryID should be correct")
     assert(vars[1] == blocky.timestamp, "timestamp should be correct")
     assert(vars[2] == h.bytes(100), "value should be correct")
     assert(vars[3] == accounts[1].address, "accounts[1] should be correct")
+    assert(vars2[4] == accounts[2].address, "initiator should be correct")
     assert(await gov.getOpenDisputesOnId(QUERYID1) == 1, "open disputes on ID should be correct")
     assert(await gov.getVoteRounds(_hash) == 1, "number of vote rounds should be correct")
     assert(balance1 - balance2 - (await flex.getStakeAmount()/10) == 0, "dispute fee paid should be correct")
@@ -69,7 +77,7 @@ describe("Governance Function Tests", function() {
     blocky = await h.getBlock()
     await h.advanceTime(86400 + 10)
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("10"))
-    await h.expectThrow(gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)) //fast forward assert
+    await h.expectThrow(gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)) //dispute must be started within timeframe
   });
   it("Test executeVote()", async function() {
     await token.connect(accounts[1]).approve(flex.address, web3.utils.toWei("1000"))
@@ -154,6 +162,7 @@ describe("Governance Function Tests", function() {
     assert(voteInfo[1][4] == blocky.timestamp, "Tally date should be correct")
     await gov.executeVote(1)
     await h.expectThrow(gov.connect(accounts[1]).tallyVotes(1)) // Dispute has been already executed
+    assert(await token.balanceOf(accounts[2].address)== 0, "should not have tokens returned")
   });
   it("Test vote()", async function() {
     // vote (1 dispute must exist, 2)cannot have been tallied, 3)sender has already voted)
@@ -222,16 +231,23 @@ describe("Governance Function Tests", function() {
     await flex.connect(accounts[2]).depositStake(web3.utils.toWei("20"))
     await flex.connect(accounts[2]).submitValue(h.uintTob32(1), h.uintTob32(100), 0, '0x')
     blocky = await h.getBlock()
+    await token.connect(accounts[1]).transfer(accounts[3].address, web3.utils.toWei("20"))
+    await token.connect(accounts[3]).approve(flex.address, web3.utils.toWei("20"))
+    await flex.connect(accounts[3]).depositStake(web3.utils.toWei("20"))
+    await flex.connect(accounts[3]).submitValue(h.uintTob32(1), h.uintTob32(100), 0, '0x')
+    let blocky2 = await h.getBlock()
     await token.connect(accounts[1]).approve(gov.address, web3.utils.toWei("10"))
     assert(await gov.getOpenDisputesOnId(h.uintTob32(1)) == 0, "Open disputes on ID should be correct")
     await gov.connect(accounts[1]).beginDispute(h.uintTob32(1), blocky.timestamp)
     assert(await gov.getOpenDisputesOnId(h.uintTob32(1)) == 1, "Open disputes on ID should be correct")
+    await gov.connect(accounts[1]).beginDispute(h.uintTob32(1), blocky2.timestamp)
+    assert(await gov.getOpenDisputesOnId(h.uintTob32(1)) == 2, "Open disputes on ID should be correct")
     await gov.connect(accounts[1]).vote(1, true, false)
     await h.advanceTime(86400 * 2)
     await gov.connect(accounts[1]).tallyVotes(1)
     await h.advanceTime(86400)
     await gov.executeVote(1)
-    assert(await gov.getOpenDisputesOnId(h.uintTob32(1)) == 0, "Open disputes on ID should be correct")
+    assert(await gov.getOpenDisputesOnId(h.uintTob32(1)) == 1, "Open disputes on ID should be correct")
   });
   it("Test getVoteCount()", async function() {
     assert(await gov.getVoteCount() == 0, "Vote count should start at 0")

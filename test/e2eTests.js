@@ -9,7 +9,9 @@ const QUERYID1 = h.uintTob32(1)
 const abiCoder = new ethers.utils.AbiCoder
 const autopayQueryData = abiCoder.encode(["string", "bytes"], ["AutopayAddresses", abiCoder.encode(['bytes'], ['0x'])])
 const autopayQueryId = ethers.utils.keccak256(autopayQueryData)
-
+const TRB_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["trb", "usd"])
+const TRB_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", TRB_QUERY_DATA_ARGS])
+const TRB_QUERY_ID = ethers.utils.keccak256(TRB_QUERY_DATA)
 
 describe("Governance End-To-End Tests", function() {
 
@@ -22,7 +24,7 @@ describe("Governance End-To-End Tests", function() {
     await token.deployed();
     const Governance = await ethers.getContractFactory("Governance");
     const TellorFlex = await ethers.getContractFactory("TellorFlex")
-    flex = await TellorFlex.deploy(token.address, 86400/2, web3.utils.toWei("100"), web3.utils.toWei("10"))
+    flex = await TellorFlex.deploy(token.address, 86400/2, web3.utils.toWei("100"), web3.utils.toWei("10"),TRB_QUERY_ID)
     await flex.deployed();
     gov = await Governance.deploy(flex.address,  accounts[0].address);
     await gov.deployed();
@@ -99,6 +101,12 @@ describe("Governance End-To-End Tests", function() {
     await gov.executeVote(1)
     await gov.executeVote(2)
     await gov.executeVote(3)
+    for (var i = 1; i < 4; i++) {
+      vars = await gov.getVoteInfo(i)
+      assert(vars[3] == 2, "Vote result should be INVALID")
+    }
+    let s = await token.balanceOf(accounts[1].address)
+    assert(s - web3.utils.toWei("510") == 0, "should have tokens returned")
   });
   it("Test no votes on a dispute", async function() {
     await token.connect(accounts[1]).approve(flex.address, web3.utils.toWei("10"))
@@ -118,6 +126,8 @@ describe("Governance End-To-End Tests", function() {
     assert(await token.balanceOf(accounts[2].address) - balance2 == web3.utils.toWei("1"), "account2 balance should increase by fee amount")
     voteInfo = await gov.getVoteInfo(1)
     assert(voteInfo[3] == 2, "Vote result should be correct")
+    let s = await token.balanceOf(accounts[1].address)
+    assert(s - web3.utils.toWei("900") == 0, "should have tokens returned")
   });
   it("Test multiple vote rounds on a dispute, all passing", async function() {
     await token.connect(accounts[1]).approve(flex.address, web3.utils.toWei("10"))

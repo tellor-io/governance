@@ -2,15 +2,10 @@
 
 ## Overview <a name="overview"> </a>
 
-<b>Governance</b> is a governance contract which manages disputes and proposals for [Tellor on other EVM blockchains](https://github.com/tellor-io/tellorFlex). 
+<b>Governance</b> is a governance contract which manages disputes for [Tellor on other EVM blockchains](https://github.com/tellor-io/tellorFlex). 
 
-For more in-depth information about Tellor checkout our [documenation](https://docs.tellor.io/tellor/), [whitepaper](https://docs.tellor.io/tellor/whitepaper/introduction) and [website](https://tellor.io/).
+For more in-depth information about Tellor, checkout our [documenation](https://docs.tellor.io/tellor/), [whitepaper](https://docs.tellor.io/tellor/whitepaper/introduction) and [website](https://tellor.io/).
 
-Quick references are included below:
-
-* <b> [Reporter Documentation](https://docs.tellor.io/tellor/telliot/telliot)</b>
-
-* <b> [Integration Documentation](https://docs.tellor.io/tellor/integration/introduction)</b>
 
 ## Setting up and testing
 

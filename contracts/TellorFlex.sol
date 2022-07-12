@@ -3,7 +3,6 @@ pragma solidity 0.8.3;
 
 import "./interfaces/IERC20.sol";
 import "./interfaces/IGovernance.sol";
-import "hardhat/console.sol";
 
 /**
  @author Tellor Inc.
@@ -21,8 +20,7 @@ contract TellorFlex {
     uint256 public timeBasedReward = 5e17;
     uint256 public stakeAmount; //amount required to be a staker
     uint256 public stakeAmountDollarTarget; // amount of US dollars required to be a staker
-    bytes32 public trbUsdSpotPriceQueryId =
-        keccak256(abi.encode("SpotPrice", abi.encode("trb", "usd")));
+    bytes32 public stakingTokenPriceQueryId; // staking token SpotPrice queryId
     uint256 public totalStakeAmount; //total amount of tokens locked in contract (via stake)
     uint256 public reportingLock; // base amount of time before a reporter is able to submit a value again
     uint256 public timeOfLastNewValue = block.timestamp; // time of the last new submitted value, originally set to the block timestamp
@@ -32,6 +30,7 @@ contract TellorFlex {
     uint256 public totalRewardDebt;
     uint256 public stakingRewardsBalance;
     uint256 public totalTimeBasedRewardsBalance; // amount of TBR deposited into Tellor Flex
+    uint256 public totalStakers;
 
     mapping(bytes32 => Report) private reports; // mapping of query IDs to a report
     mapping(address => StakeInfo) stakerDetails; //mapping from a persons address to their staking info
@@ -56,6 +55,7 @@ contract TellorFlex {
         uint256 startVoteCount; // total number of governance votes when stake deposited
         uint256 startVoteTally; // staker vote tally when stake deposited
         mapping(bytes32 => uint256) reportsSubmittedByQueryId;
+        bool staked; // used to keep track of total stakers
     }
 
     // Events
@@ -87,19 +87,22 @@ contract TellorFlex {
      * @param _reportingLock base amount of time (seconds) before reporter is able to report again
      * @param _stakeAmountDollarTarget fixed amount of dollars that TRB stake amount is worth
      * @param _priceTRB price of TRB in USD
+     * @param _stakingTokenPriceQueryId queryId where staking token price is reported
      */
     constructor(
         address _token,
         uint256 _reportingLock,
         uint256 _stakeAmountDollarTarget,
-        uint256 _priceTRB
+        uint256 _priceTRB,
+        bytes32 _stakingTokenPriceQueryId
     ) {
         require(_token != address(0), "must set token address");
         token = IERC20(_token);
         owner = msg.sender;
         reportingLock = _reportingLock;
         stakeAmountDollarTarget = _stakeAmountDollarTarget;
-        stakeAmount = (_stakeAmountDollarTarget * 10**18) / _priceTRB;
+        stakeAmount = (_stakeAmountDollarTarget * 1e18) / _priceTRB;
+        stakingTokenPriceQueryId = _stakingTokenPriceQueryId;
     }
 
     function init(address _governanceAddress) external {
@@ -109,7 +112,6 @@ contract TellorFlex {
             _governanceAddress != address(0),
             "governance address can't be zero address"
         );
-
         governance = _governanceAddress;
     }
 
@@ -133,6 +135,7 @@ contract TellorFlex {
         StakeInfo storage _staker = stakerDetails[msg.sender];
         if (_staker.lockedBalance > 0) {
             if (_staker.lockedBalance >= _amount) {
+                // if staker's locked balance covers full _amount, use that
                 _staker.lockedBalance -= _amount;
             } else {
                 require(
@@ -166,19 +169,19 @@ contract TellorFlex {
      */
     function removeValue(bytes32 _queryId, uint256 _timestamp) external {
         require(msg.sender == governance, "caller must be governance address");
-        Report storage rep = reports[_queryId];
-        uint256 _index = rep.timestampIndex[_timestamp];
-        require(_timestamp == rep.timestamps[_index], "invalid timestamp");
+        Report storage _report = reports[_queryId];
+        uint256 _index = _report.timestampIndex[_timestamp];
+        require(_timestamp == _report.timestamps[_index], "invalid timestamp");
         // Shift all timestamps back to reflect deletion of value
-        for (uint256 _i = _index; _i < rep.timestamps.length - 1; _i++) {
-            rep.timestamps[_i] = rep.timestamps[_i + 1];
-            rep.timestampIndex[rep.timestamps[_i]] -= 1;
+        for (uint256 _i = _index; _i < _report.timestamps.length - 1; _i++) {
+            _report.timestamps[_i] = _report.timestamps[_i + 1];
+            _report.timestampIndex[_report.timestamps[_i]] -= 1;
         }
         // Delete and reset timestamp and value
-        delete rep.timestamps[rep.timestamps.length - 1];
-        rep.timestamps.pop();
-        rep.valueByTimestamp[_timestamp] = "";
-        rep.timestampIndex[_timestamp] = 0;
+        delete _report.timestamps[_report.timestamps.length - 1];
+        _report.timestamps.pop();
+        _report.valueByTimestamp[_timestamp] = "";
+        _report.timestampIndex[_timestamp] = 0;
         emit ValueRemoved(_queryId, _timestamp);
     }
 
@@ -216,7 +219,6 @@ contract TellorFlex {
             "zero staker balance"
         );
         uint256 _slashAmount;
-        _updateStakeAmount();
         if (_staker.lockedBalance >= stakeAmount) {
             _slashAmount = stakeAmount;
             _staker.lockedBalance -= stakeAmount;
@@ -252,13 +254,12 @@ contract TellorFlex {
         uint256 _nonce,
         bytes calldata _queryData
     ) external {
-        Report storage rep = reports[_queryId];
+        Report storage _report = reports[_queryId];
         require(
-            _nonce == rep.timestamps.length || _nonce == 0,
+            _nonce == _report.timestamps.length || _nonce == 0,
             "nonce must match timestamp index"
         );
         StakeInfo storage _staker = stakerDetails[msg.sender];
-        _updateStakeAmount();
         require(
             _staker.stakedBalance >= stakeAmount,
             "balance must be greater than stake amount"
@@ -276,21 +277,26 @@ contract TellorFlex {
         _staker.reporterLastTimestamp = block.timestamp;
         // Checks for no double reporting of timestamps
         require(
-            rep.reporterByTimestamp[block.timestamp] == address(0),
+            _report.reporterByTimestamp[block.timestamp] == address(0),
             "timestamp already reported for"
         );
         // Update number of timestamps, value for given timestamp, and reporter for timestamp
-        rep.timestampIndex[block.timestamp] = rep.timestamps.length;
-        rep.timestamps.push(block.timestamp);
-        rep.timestampToBlockNum[block.timestamp] = block.number;
-        rep.valueByTimestamp[block.timestamp] = _value;
-        rep.reporterByTimestamp[block.timestamp] = msg.sender;
+        _report.timestampIndex[block.timestamp] = _report.timestamps.length;
+        _report.timestamps.push(block.timestamp);
+        _report.timestampToBlockNum[block.timestamp] = block.number;
+        _report.valueByTimestamp[block.timestamp] = _value;
+        _report.reporterByTimestamp[block.timestamp] = msg.sender;
         // Disperse Time Based Reward
         uint256 _timeDiff = block.timestamp - timeOfLastNewValue;
         uint256 _reward = (_timeDiff * timeBasedReward) / 300; //.5 TRB per 5 minutes
-        if (_reward > 0 && totalTimeBasedRewardsBalance > _reward) {
-            token.transfer(msg.sender, _reward);
-            totalTimeBasedRewardsBalance -= _reward;
+        if (_reward > 0 && totalTimeBasedRewardsBalance > 0) {
+            if (totalTimeBasedRewardsBalance < _reward) {
+                token.transfer(msg.sender, totalTimeBasedRewardsBalance);
+                totalTimeBasedRewardsBalance = 0;
+            } else {
+                token.transfer(msg.sender, _reward);
+                totalTimeBasedRewardsBalance -= _reward;
+            }
         }
         // Update last oracle value and number of values submitted by a reporter
         timeOfLastNewValue = block.timestamp;
@@ -306,6 +312,22 @@ contract TellorFlex {
         );
     }
 
+    function updateStakeAmount() external {
+        (bool _valFound, bytes memory _val, ) = getDataBefore(
+            stakingTokenPriceQueryId,
+            block.timestamp - 12 hours
+        );
+        if (_valFound) {
+            uint256 _priceTRB = abi.decode(_val, (uint256));
+            require(
+                _priceTRB >= 0.01 ether && _priceTRB < 1000000 ether,
+                "invalid trb price"
+            );
+            stakeAmount = (stakeAmountDollarTarget * 1e18) / _priceTRB;
+            emit NewStakeAmount(stakeAmount);
+        }
+    }
+
     function updateTotalTimeBasedRewardsBalance() external {
         totalTimeBasedRewardsBalance =
             token.balanceOf(address(this)) -
@@ -316,12 +338,18 @@ contract TellorFlex {
      * @dev Withdraws a reporter's stake
      */
     function withdrawStake() external {
-        StakeInfo storage _s = stakerDetails[msg.sender];
+        StakeInfo storage _staker = stakerDetails[msg.sender];
         // Ensure reporter is locked and that enough time has passed
-        require(block.timestamp - _s.startDate >= 7 days, "7 days didn't pass");
-        require(_s.lockedBalance > 0, "reporter not locked for withdrawal");
-        token.transfer(msg.sender, _s.lockedBalance);
-        _s.lockedBalance = 0;
+        require(
+            block.timestamp - _staker.startDate >= 7 days,
+            "7 days didn't pass"
+        );
+        require(
+            _staker.lockedBalance > 0,
+            "reporter not locked for withdrawal"
+        );
+        token.transfer(msg.sender, _staker.lockedBalance);
+        _staker.lockedBalance = 0;
         emit StakeWithdrawn(msg.sender);
     }
 
@@ -361,6 +389,35 @@ contract TellorFlex {
                     reports[_queryId].timestamps.length - 1
                 ]
             ];
+    }
+
+    /**
+     * @dev Retrieves the latest value for the queryId before the specified timestamp
+     * @param _queryId is the queryId to look up the value for
+     * @param _timestamp before which to search for latest value
+     * @return _ifRetrieve bool true if able to retrieve a non-zero value
+     * @return _value the value retrieved
+     * @return _timestampRetrieved the value's timestamp
+     */
+    function getDataBefore(bytes32 _queryId, uint256 _timestamp)
+        public
+        view
+        returns (
+            bool _ifRetrieve,
+            bytes memory _value,
+            uint256 _timestampRetrieved
+        )
+    {
+        (bool _found, uint256 _index) = getIndexForDataBefore(
+            _queryId,
+            _timestamp
+        );
+        if (!_found) return (false, bytes(""), 0);
+        uint256 _time = getTimestampbyQueryIdandIndex(_queryId, _index);
+        _value = retrieveData(_queryId, _time);
+        if (keccak256(_value) != keccak256(bytes("")))
+            return (true, _value, _time);
+        return (false, bytes(""), 0);
     }
 
     /**
@@ -640,35 +697,6 @@ contract TellorFlex {
     }
 
     /**
-     * @dev Retrieves the latest value for the queryId before the specified timestamp
-     * @param _queryId is the queryId to look up the value for
-     * @param _timestamp before which to search for latest value
-     * @return _ifRetrieve bool true if able to retrieve a non-zero value
-     * @return _value the value retrieved
-     * @return _timestampRetrieved the value's timestamp
-     */
-    function getDataBefore(bytes32 _queryId, uint256 _timestamp)
-        public
-        view
-        returns (
-            bool _ifRetrieve,
-            bytes memory _value,
-            uint256 _timestampRetrieved
-        )
-    {
-        (bool _found, uint256 _index) = getIndexForDataBefore(
-            _queryId,
-            _timestamp
-        );
-        if (!_found) return (false, bytes(""), 0);
-        uint256 _time = getTimestampbyQueryIdandIndex(_queryId, _index);
-        _value = retrieveData(_queryId, _time);
-        if (keccak256(_value) != keccak256(bytes("")))
-            return (true, _value, _time);
-        return (false, bytes(""), 0);
-    }
-
-    /**
      * @dev Returns the address of the token used for staking
      * @return address of the token used for staking
      */
@@ -685,6 +713,14 @@ contract TellorFlex {
     }
 
     /**
+     * @dev Returns total number of current stakers. Reporters with stakedBalance less than stakeAmount are excluded from this total
+     * @return uint256 total stakers
+     */
+    function getTotalStakers() external view returns (uint256) {
+        return totalStakers;
+    }
+
+    /**
      * @dev Retrieve value from oracle based on timestamp
      * @param _queryId being requested
      * @param _timestamp to retrieve data/value from
@@ -698,32 +734,31 @@ contract TellorFlex {
         return reports[_queryId].valueByTimestamp[_timestamp];
     }
 
+    /**
+     * @dev Used during the upgrade process to verify valid Tellor Contracts
+     */
+    function verify() external pure returns (uint256) {
+        return 9999;
+    }
+
     // *****************************************************************************
     // *                                                                           *
     // *                          Internal functions                               *
     // *                                                                           *
     // *****************************************************************************
 
-    function _updateStakeAmount() internal {
-        (bool valFound, bytes memory val, ) = getDataBefore(
-            trbUsdSpotPriceQueryId,
-            block.timestamp - 12 hours
-        );
-        if (valFound) {
-            uint256 _priceTRB = abi.decode(val, (uint256));
-            stakeAmount = (stakeAmountDollarTarget * 10**18) / _priceTRB;
-            emit NewStakeAmount(stakeAmount);
-        }
-    }
-
+    /**
+     * @dev Updates accumulated staking rewards per staked token
+     */
     function _updateRewards() internal {
         if (timeOfLastAllocation == block.timestamp) {
             return;
         }
-        if (totalStakeAmount == 0) {
+        if (totalStakeAmount == 0 || rewardRate == 0) {
             timeOfLastAllocation = block.timestamp;
             return;
         }
+        // calculate accumulated reward per token staked
         uint256 _newAccumulatedRewardPerShare = accumulatedRewardPerShare +
             ((block.timestamp - timeOfLastAllocation) * rewardRate * 1e18) /
             totalStakeAmount;
@@ -731,12 +766,15 @@ contract TellorFlex {
             totalStakeAmount) /
             1e18 -
             totalRewardDebt;
+        // if staking rewards run out, calculate remaining reward per staked
+        // token and set rewardRate to 0
         if (_accumulatedReward >= stakingRewardsBalance) {
+            uint256 _newPendingRewards = stakingRewardsBalance -
+                ((accumulatedRewardPerShare * totalStakeAmount) /
+                    1e18 -
+                    totalRewardDebt);
             accumulatedRewardPerShare +=
-                ((stakingRewardsBalance -
-                    ((accumulatedRewardPerShare * totalStakeAmount) /
-                        1e18 -
-                        totalRewardDebt)) * 1e18) /
+                (_newPendingRewards * 1e18) /
                 totalStakeAmount;
             rewardRate = 0;
         } else {
@@ -745,6 +783,11 @@ contract TellorFlex {
         timeOfLastAllocation = block.timestamp;
     }
 
+    /**
+     * @dev Called whenever a user's stake amount changes. First updates staking rewards,
+     * transfers pending rewards to user's address, and finally updates user's stake amount
+     * and other relevant variables.
+     */
     function _updateStakeAndPayRewards(
         address _stakerAddress,
         uint256 _newStakedBalance
@@ -779,6 +822,21 @@ contract TellorFlex {
             totalStakeAmount -= _staker.stakedBalance;
         }
         _staker.stakedBalance = _newStakedBalance;
+
+        // Update total stakers
+        if (_staker.stakedBalance >= stakeAmount) {
+            if (_staker.staked == false) {
+                totalStakers++;
+            }
+            _staker.staked = true;
+        } else {
+            if (_staker.staked == true && totalStakers > 0) {
+                totalStakers--;
+            }
+            _staker.staked = false;
+        }
+
+        // tracks rewards accumulated before stake amount updated
         _staker.rewardDebt =
             (_staker.stakedBalance * accumulatedRewardPerShare) /
             1e18;
@@ -786,6 +844,10 @@ contract TellorFlex {
         totalStakeAmount += _staker.stakedBalance;
     }
 
+    /**
+     * @dev Internal function retrieves updated accumulatedRewardPerShare
+     * @return uint256 up-to-date accumulated reward per share
+     */
     function _getUpdatedAccumulatedRewardPerShare()
         internal
         view
@@ -802,12 +864,13 @@ contract TellorFlex {
             1e18 -
             totalRewardDebt;
         if (_accumulatedReward >= stakingRewardsBalance) {
+            uint256 _newPendingRewards = stakingRewardsBalance -
+                ((accumulatedRewardPerShare * totalStakeAmount) /
+                    1e18 -
+                    totalRewardDebt);
             _newAccumulatedRewardPerShare =
                 accumulatedRewardPerShare +
-                ((stakingRewardsBalance -
-                    (accumulatedRewardPerShare *
-                        totalStakeAmount -
-                        totalRewardDebt)) * 1e18) /
+                (_newPendingRewards * 1e18) /
                 totalStakeAmount;
         }
         return _newAccumulatedRewardPerShare;
