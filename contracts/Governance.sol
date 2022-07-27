@@ -190,7 +190,7 @@ contract Governance is UsingTellor {
     function executeVote(uint256 _disputeId) external {
         // Ensure validity of vote ID, vote has been executed, and vote must be tallied
         Vote storage _thisVote = voteInfo[_disputeId];
-        require(_disputeId <= voteCount, "Vote ID must be valid");
+        require(_disputeId <= voteCount && _disputeId > 0, "Vote ID must be valid");
         require(!_thisVote.executed, "Vote has been executed");
         require(_thisVote.tallyDate > 0, "Vote must be tallied");
         // Ensure vote must be final vote and that time has to be pass (86400 = 24 * 60 * 60 for seconds in a day)
@@ -268,7 +268,7 @@ contract Governance is UsingTellor {
         // Ensure vote has not been executed and that vote has not been tallied
         Vote storage _thisVote = voteInfo[_disputeId];
         require(_thisVote.tallyDate == 0, "Vote has already been tallied");
-        require(_disputeId <= voteCount, "Vote does not exist");
+        require(_disputeId <= voteCount && _disputeId > 0, "Vote does not exist");
         // Determine appropriate vote duration dispute round
         // Vote time increases as rounds increase but only up to 6 days (withdrawal period)
         require(
@@ -355,7 +355,7 @@ contract Governance is UsingTellor {
         bool _invalidQuery
     ) external {
         // Ensure that dispute has not been executed and that vote does not exist and is not tallied
-        require(_disputeId <= voteCount, "Vote does not exist");
+        require(_disputeId <= voteCount && _disputeId > 0, "Vote does not exist");
         Vote storage _thisVote = voteInfo[_disputeId];
         require(_thisVote.tallyDate == 0, "Vote has already been tallied");
         require(!_thisVote.voted[msg.sender], "Sender has already voted");
