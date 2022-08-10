@@ -17,7 +17,8 @@ contract Governance is UsingTellor {
     IERC20 public token; // token used for dispute fees, same as reporter staking token
     address public oracleAddress; //tellorFlex address
     address public teamMultisig; // address of team multisig wallet, one of four stakeholder groups
-    uint256 public voteCount; // total number of votes initiated
+    uint256 public openVoteCount; // number of open disputes
+    uint256 public voteCount; // total number of disputes initiated
     bytes32 public autopayAddrsQueryId =
         keccak256(abi.encode("AutopayAddresses", abi.encode(bytes("")))); // query id for autopay addresses array
     mapping(uint256 => Dispute) private disputeInfo; // mapping of dispute IDs to the details of the dispute
@@ -115,6 +116,7 @@ contract Governance is UsingTellor {
         bytes32 _hash = keccak256(abi.encodePacked(_queryId, _timestamp));
         // Increment vote count and push new vote round
         voteCount++;
+        openVoteCount++;
         uint256 _disputeId = voteCount;
         voteRounds[_hash].push(_disputeId);
         // Check if dispute is started within correct time frame
@@ -204,6 +206,7 @@ contract Governance is UsingTellor {
             "1 day has to pass after tally to allow for disputes"
         );
         _thisVote.executed = true;
+        openVoteCount--;
         Dispute storage _thisDispute = disputeInfo[_disputeId];
         openDisputesOnId[_thisDispute.queryId]--;
         uint256 _i;
@@ -456,11 +459,12 @@ contract Governance is UsingTellor {
     }
 
     /**
-     * @dev Returns the total number of votes
-     * @return uint256 of the total number of votes
+     * @dev Returns the total number of disputes and the number of open disputes
+     * @return _voteCount total number of disputes
+     * @return _openVoteCount total number of live disputes
      */
-    function getVoteCount() external view returns (uint256) {
-        return voteCount;
+    function getVoteCount() external view returns (uint256 _voteCount, uint256 _openVoteCount) {
+        return (voteCount, openVoteCount);
     }
 
     /**
