@@ -307,20 +307,20 @@ contract Governance is UsingTellor {
         }
         // Normalize and combine each stakeholder group votes
         uint256 _scaledDoesSupport = ((_thisVote.tokenholders.doesSupport *
-            10000) / _tokenVoteSum) +
-            ((_thisVote.reporters.doesSupport * 10000) / _reportersVoteSum) +
-            ((_thisVote.teamMultisig.doesSupport * 10000) / _multisigVoteSum) +
-            ((_thisVote.users.doesSupport * 10000) / _usersVoteSum);
-        uint256 _scaledAgainst = ((_thisVote.tokenholders.against * 10000) /
+            1e18) / _tokenVoteSum) +
+            ((_thisVote.reporters.doesSupport * 1e18) / _reportersVoteSum) +
+            ((_thisVote.teamMultisig.doesSupport * 1e18) / _multisigVoteSum) +
+            ((_thisVote.users.doesSupport * 1e18) / _usersVoteSum);
+        uint256 _scaledAgainst = ((_thisVote.tokenholders.against * 1e18) /
             _tokenVoteSum) +
-            ((_thisVote.reporters.against * 10000) / _reportersVoteSum) +
-            ((_thisVote.teamMultisig.against * 10000) / _multisigVoteSum) +
-            ((_thisVote.users.against * 10000) / _usersVoteSum);
-        uint256 _scaledInvalid = ((_thisVote.tokenholders.invalidQuery * 10000) /
+            ((_thisVote.reporters.against * 1e18) / _reportersVoteSum) +
+            ((_thisVote.teamMultisig.against * 1e18) / _multisigVoteSum) +
+            ((_thisVote.users.against * 1e18) / _usersVoteSum);
+        uint256 _scaledInvalid = ((_thisVote.tokenholders.invalidQuery * 1e18) /
             _tokenVoteSum) +
-            ((_thisVote.reporters.invalidQuery * 10000) / _reportersVoteSum) +
-            ((_thisVote.teamMultisig.invalidQuery * 10000) / _multisigVoteSum) +
-            ((_thisVote.users.invalidQuery * 10000) / _usersVoteSum);
+            ((_thisVote.reporters.invalidQuery * 1e18) / _reportersVoteSum) +
+            ((_thisVote.teamMultisig.invalidQuery * 1e18) / _multisigVoteSum) +
+            ((_thisVote.users.invalidQuery * 1e18) / _usersVoteSum);
         // If there are more invalid votes than for and against, result is invalid
         if (
             _scaledInvalid >= _scaledDoesSupport && _scaledInvalid >= _scaledAgainst
