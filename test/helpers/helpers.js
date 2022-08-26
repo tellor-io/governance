@@ -82,6 +82,10 @@ advanceTime = async (time) =>{
     return web3.utils.toHex(n)
   }
 
+  function toWei(n) {
+    return web3.utils.toWei(n)
+  }
+
 module.exports = {
   stakeAmount: new BN(web3.utils.toWei("500", "ether")),
   timeTarget: 240,
@@ -90,6 +94,7 @@ module.exports = {
   getBlock,
   zeroAddress:"0x0000000000000000000000000000000000000000",
   to18, 
+  toWei,
   uintTob32,
   tob32,
   maxUint256: new BN("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),

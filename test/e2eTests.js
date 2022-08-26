@@ -302,4 +302,16 @@ describe("Governance End-To-End Tests", function() {
     await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
     assert(await flex.getCurrentValue(QUERYID1) == h.bytes(200), "Current value shouldn't be dispute value");
   })
+  it("Cannot vote on dispute id 0", async function() {
+    await h.expectThrow(gov.vote(0, true, false))
+    await token.connect(accounts[1]).approve(flex.address, h.toWei("10"))
+    await flex.connect(accounts[1]).depositStake(h.toWei("10"))
+    await flex.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    blocky = await h.getBlock()
+    await token.connect(accounts[1]).transfer(accounts[2].address, h.toWei("100"))
+    await token.connect(accounts[2]).approve(gov.address, h.toWei("10"))
+    await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
+    await h.expectThrow(gov.connect(accounts[2]).vote(0, true, false))
+    await gov.connect(accounts[2]).vote(1, true, false)
+  })
 })
