@@ -116,24 +116,13 @@ contract Governance is UsingTellor {
         // Increment vote count and push new vote round
         voteCount++;
         uint256 _disputeId = voteCount;
-        voteRounds[_hash].push(_disputeId);
-        // Check if dispute is started within correct time frame
-        if (voteRounds[_hash].length > 1) {
-            uint256 _prevId = voteRounds[_hash][voteRounds[_hash].length - 2];
-            require(
-                block.timestamp - voteInfo[_prevId].tallyDate < 1 days,
-                "New dispute round must be started within a day"
-            ); // Within a day for new round
-        } else {
-            require(
-                block.timestamp - _timestamp < 12 hours,
-                "Dispute must be started within reporting lock time"
-            ); // New dispute within reporting lock
-            openDisputesOnId[_queryId]++;
-        }
+        uint256[] storage _voteRounds = voteRounds[_hash];
+        _voteRounds.push(_disputeId);
+
         // Create new vote and dispute
         Vote storage _thisVote = voteInfo[_disputeId];
         Dispute storage _thisDispute = disputeInfo[_disputeId];
+
         // Initialize dispute information - query ID, timestamp, value, etc.
         _thisDispute.queryId = _queryId;
         _thisDispute.timestamp = _timestamp;
@@ -147,34 +136,36 @@ contract Governance is UsingTellor {
         _thisVote.initiator = msg.sender;
         _thisVote.blockNumber = block.number;
         _thisVote.startDate = block.timestamp;
-        _thisVote.voteRound = voteRounds[_hash].length;
+        _thisVote.voteRound = _voteRounds.length;
+        
         uint256 _disputeFee = getDisputeFee();
-        // Calculate dispute fee based on number of current vote rounds
-        if (voteRounds[_hash].length == 1) {
+        if (_voteRounds.length == 1) {
+            require(
+                block.timestamp - _timestamp < 12 hours,
+                "Dispute must be started within reporting lock time"
+            );
+            openDisputesOnId[_queryId]++;
+            // calculate dispute fee based on number of open disputes on query ID
             _disputeFee = _disputeFee * 2**(openDisputesOnId[_queryId] - 1);
+            // slash a single stakeAmount from reporter
+            _thisDispute.slashedAmount = oracle.slashReporter(_thisDispute.disputedReporter, address(this));
+            _thisDispute.value = oracle.retrieveData(_queryId, _timestamp);
+            oracle.removeValue(_queryId, _timestamp);
         } else {
-            _disputeFee = _disputeFee * 2**(voteRounds[_hash].length - 1);
-        }
-        if (_disputeFee > oracle.getStakeAmount()) {
-            _disputeFee = oracle.getStakeAmount();
+            uint256 _prevId = _voteRounds[_voteRounds.length - 2];
+            require(
+                block.timestamp - voteInfo[_prevId].tallyDate < 1 days,
+                "New dispute round must be started within a day"
+            );
+            _disputeFee = _disputeFee * 2**(_voteRounds.length - 1);
+            _thisDispute.slashedAmount = disputeInfo[_voteRounds[0]].slashedAmount;
+            _thisDispute.value = disputeInfo[_voteRounds[0]].value;
         }
         _thisVote.fee = _disputeFee;
         require(
             token.transferFrom(msg.sender, address(this), _disputeFee),
             "Fee must be paid"
         ); // This is the dispute fee. Returned if dispute passes
-        // The slashedAmount is set in TellorFlex.slashReporter function
-        // It allows for slashing one stake per disputed value for the same reporter
-        if (voteRounds[_hash].length == 1) {
-            _thisDispute.slashedAmount = oracle.slashReporter(
-                _thisDispute.disputedReporter,
-                address(this)
-            );
-            oracle.removeValue(_queryId, _timestamp);
-        } else {
-            _thisDispute.slashedAmount = disputeInfo[voteRounds[_hash][0]]
-                .slashedAmount;
-        }
         emit NewDispute(
             _disputeId,
             _queryId,
