@@ -25,6 +25,7 @@ contract Governance is UsingTellor {
     mapping(uint256 => Vote) private voteInfo; // mapping of dispute IDs to the details of the vote
     mapping(bytes32 => uint256[]) private voteRounds; // mapping of vote identifier hashes to an array of dispute IDs
     mapping(address => uint256) private voteTallyByAddress; // mapping of addresses to the number of votes they have cast
+    mapping(address => uint256[]) private disputeIdsByReporter; // mapping of reporter addresses to an array of dispute IDs
 
     enum VoteResult {
         FAILED,
@@ -137,7 +138,7 @@ contract Governance is UsingTellor {
         _thisVote.blockNumber = block.number;
         _thisVote.startDate = block.timestamp;
         _thisVote.voteRound = _voteRounds.length;
-        
+        disputeIdsByReporter[_thisDispute.disputedReporter].push(_disputeId);
         uint256 _disputeFee = getDisputeFee();
         if (_voteRounds.length == 1) {
             require(
@@ -181,8 +182,8 @@ contract Governance is UsingTellor {
     function executeVote(uint256 _disputeId) external {
         // Ensure validity of vote ID, vote has been executed, and vote must be tallied
         Vote storage _thisVote = voteInfo[_disputeId];
-        require(_disputeId <= voteCount && _disputeId > 0, "Vote ID must be valid");
-        require(!_thisVote.executed, "Vote has been executed");
+        require(_disputeId <= voteCount && _disputeId > 0, "Dispute ID must be valid");
+        require(!_thisVote.executed, "Vote has already been executed");
         require(_thisVote.tallyDate > 0, "Vote must be tallied");
         // Ensure vote must be final vote and that time has to be pass (86400 = 24 * 60 * 60 for seconds in a day)
         require(
@@ -409,6 +410,11 @@ contract Governance is UsingTellor {
      */
     function getDisputeFee() public view returns (uint256) {
         return (oracle.getStakeAmount() / 10);
+    }
+
+
+    function getDisputesByReporter(address _reporter) external view returns (uint256[] memory) {
+        return disputeIdsByReporter[_reporter];
     }
 
     /**
