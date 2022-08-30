@@ -542,7 +542,7 @@ contract Governance is UsingTellor {
      */
     function _getUserTips(address _user) internal returns (uint256 _userTipTally) {
         // get autopay addresses array from oracle
-        (, bytes memory _autopayAddrsBytes, uint256 _timestamp) = getDataBefore(
+        (bytes memory _autopayAddrsBytes, uint256 _timestamp) = getDataBefore(
             autopayAddrsQueryId,
             block.timestamp - 12 hours
         );
