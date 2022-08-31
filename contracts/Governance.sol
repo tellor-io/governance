@@ -25,6 +25,7 @@ contract Governance is UsingTellor {
     mapping(uint256 => Vote) private voteInfo; // mapping of dispute IDs to the details of the vote
     mapping(bytes32 => uint256[]) private voteRounds; // mapping of vote identifier hashes to an array of dispute IDs
     mapping(address => uint256) private voteTallyByAddress; // mapping of addresses to the number of votes they have cast
+    mapping(address => uint256[]) private disputeIdsByReporter; // mapping of reporter addresses to an array of dispute IDs
 
     enum VoteResult {
         FAILED,
@@ -116,24 +117,13 @@ contract Governance is UsingTellor {
         // Increment vote count and push new vote round
         voteCount++;
         uint256 _disputeId = voteCount;
-        voteRounds[_hash].push(_disputeId);
-        // Check if dispute is started within correct time frame
-        if (voteRounds[_hash].length > 1) {
-            uint256 _prevId = voteRounds[_hash][voteRounds[_hash].length - 2];
-            require(
-                block.timestamp - voteInfo[_prevId].tallyDate < 1 days,
-                "New dispute round must be started within a day"
-            ); // Within a day for new round
-        } else {
-            require(
-                block.timestamp - _timestamp < 12 hours,
-                "Dispute must be started within reporting lock time"
-            ); // New dispute within reporting lock
-            openDisputesOnId[_queryId]++;
-        }
+        uint256[] storage _voteRounds = voteRounds[_hash];
+        _voteRounds.push(_disputeId);
+
         // Create new vote and dispute
         Vote storage _thisVote = voteInfo[_disputeId];
         Dispute storage _thisDispute = disputeInfo[_disputeId];
+
         // Initialize dispute information - query ID, timestamp, value, etc.
         _thisDispute.queryId = _queryId;
         _thisDispute.timestamp = _timestamp;
@@ -147,34 +137,36 @@ contract Governance is UsingTellor {
         _thisVote.initiator = msg.sender;
         _thisVote.blockNumber = block.number;
         _thisVote.startDate = block.timestamp;
-        _thisVote.voteRound = voteRounds[_hash].length;
+        _thisVote.voteRound = _voteRounds.length;
+        disputeIdsByReporter[_thisDispute.disputedReporter].push(_disputeId);
         uint256 _disputeFee = getDisputeFee();
-        // Calculate dispute fee based on number of current vote rounds
-        if (voteRounds[_hash].length == 1) {
+        if (_voteRounds.length == 1) {
+            require(
+                block.timestamp - _timestamp < 12 hours,
+                "Dispute must be started within reporting lock time"
+            );
+            openDisputesOnId[_queryId]++;
+            // calculate dispute fee based on number of open disputes on query ID
             _disputeFee = _disputeFee * 2**(openDisputesOnId[_queryId] - 1);
+            // slash a single stakeAmount from reporter
+            _thisDispute.slashedAmount = oracle.slashReporter(_thisDispute.disputedReporter, address(this));
+            _thisDispute.value = oracle.retrieveData(_queryId, _timestamp);
+            oracle.removeValue(_queryId, _timestamp);
         } else {
-            _disputeFee = _disputeFee * 2**(voteRounds[_hash].length - 1);
-        }
-        if (_disputeFee > oracle.getStakeAmount()) {
-            _disputeFee = oracle.getStakeAmount();
+            uint256 _prevId = _voteRounds[_voteRounds.length - 2];
+            require(
+                block.timestamp - voteInfo[_prevId].tallyDate < 1 days,
+                "New dispute round must be started within a day"
+            );
+            _disputeFee = _disputeFee * 2**(_voteRounds.length - 1);
+            _thisDispute.slashedAmount = disputeInfo[_voteRounds[0]].slashedAmount;
+            _thisDispute.value = disputeInfo[_voteRounds[0]].value;
         }
         _thisVote.fee = _disputeFee;
         require(
             token.transferFrom(msg.sender, address(this), _disputeFee),
             "Fee must be paid"
         ); // This is the dispute fee. Returned if dispute passes
-        // The slashedAmount is set in TellorFlex.slashReporter function
-        // It allows for slashing one stake per disputed value for the same reporter
-        if (voteRounds[_hash].length == 1) {
-            _thisDispute.slashedAmount = oracle.slashReporter(
-                _thisDispute.disputedReporter,
-                address(this)
-            );
-            oracle.removeValue(_queryId, _timestamp);
-        } else {
-            _thisDispute.slashedAmount = disputeInfo[voteRounds[_hash][0]]
-                .slashedAmount;
-        }
         emit NewDispute(
             _disputeId,
             _queryId,
@@ -190,8 +182,8 @@ contract Governance is UsingTellor {
     function executeVote(uint256 _disputeId) external {
         // Ensure validity of vote ID, vote has been executed, and vote must be tallied
         Vote storage _thisVote = voteInfo[_disputeId];
-        require(_disputeId <= voteCount && _disputeId > 0, "Vote ID must be valid");
-        require(!_thisVote.executed, "Vote has been executed");
+        require(_disputeId <= voteCount && _disputeId > 0, "Dispute ID must be valid");
+        require(!_thisVote.executed, "Vote has already been executed");
         require(_thisVote.tallyDate > 0, "Vote must be tallied");
         // Ensure vote must be final vote and that time has to be pass (86400 = 24 * 60 * 60 for seconds in a day)
         require(
@@ -307,20 +299,20 @@ contract Governance is UsingTellor {
         }
         // Normalize and combine each stakeholder group votes
         uint256 _scaledDoesSupport = ((_thisVote.tokenholders.doesSupport *
-            10000) / _tokenVoteSum) +
-            ((_thisVote.reporters.doesSupport * 10000) / _reportersVoteSum) +
-            ((_thisVote.teamMultisig.doesSupport * 10000) / _multisigVoteSum) +
-            ((_thisVote.users.doesSupport * 10000) / _multisigVoteSum);
-        uint256 _scaledAgainst = ((_thisVote.tokenholders.against * 10000) /
+            1e18) / _tokenVoteSum) +
+            ((_thisVote.reporters.doesSupport * 1e18) / _reportersVoteSum) +
+            ((_thisVote.teamMultisig.doesSupport * 1e18) / _multisigVoteSum) +
+            ((_thisVote.users.doesSupport * 1e18) / _usersVoteSum);
+        uint256 _scaledAgainst = ((_thisVote.tokenholders.against * 1e18) /
             _tokenVoteSum) +
-            ((_thisVote.reporters.against * 10000) / _reportersVoteSum) +
-            ((_thisVote.teamMultisig.against * 10000) / _multisigVoteSum) +
-            ((_thisVote.users.against * 10000) / _multisigVoteSum);
-        uint256 _scaledInvalid = ((_thisVote.tokenholders.invalidQuery * 10000) /
+            ((_thisVote.reporters.against * 1e18) / _reportersVoteSum) +
+            ((_thisVote.teamMultisig.against * 1e18) / _multisigVoteSum) +
+            ((_thisVote.users.against * 1e18) / _usersVoteSum);
+        uint256 _scaledInvalid = ((_thisVote.tokenholders.invalidQuery * 1e18) /
             _tokenVoteSum) +
-            ((_thisVote.reporters.invalidQuery * 10000) / _reportersVoteSum) +
-            ((_thisVote.teamMultisig.invalidQuery * 10000) / _multisigVoteSum) +
-            ((_thisVote.users.invalidQuery * 10000) / _multisigVoteSum);
+            ((_thisVote.reporters.invalidQuery * 1e18) / _reportersVoteSum) +
+            ((_thisVote.teamMultisig.invalidQuery * 1e18) / _multisigVoteSum) +
+            ((_thisVote.users.invalidQuery * 1e18) / _usersVoteSum);
         // If there are more invalid votes than for and against, result is invalid
         if (
             _scaledInvalid >= _scaledDoesSupport && _scaledInvalid >= _scaledAgainst
@@ -418,6 +410,11 @@ contract Governance is UsingTellor {
      */
     function getDisputeFee() public view returns (uint256) {
         return (oracle.getStakeAmount() / 10);
+    }
+
+
+    function getDisputesByReporter(address _reporter) external view returns (uint256[] memory) {
+        return disputeIdsByReporter[_reporter];
     }
 
     /**
@@ -545,7 +542,7 @@ contract Governance is UsingTellor {
      */
     function _getUserTips(address _user) internal returns (uint256 _userTipTally) {
         // get autopay addresses array from oracle
-        (, bytes memory _autopayAddrsBytes, uint256 _timestamp) = getDataBefore(
+        (bytes memory _autopayAddrsBytes, uint256 _timestamp) = getDataBefore(
             autopayAddrsQueryId,
             block.timestamp - 12 hours
         );
