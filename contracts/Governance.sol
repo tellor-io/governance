@@ -127,7 +127,6 @@ contract Governance is UsingTellor {
         // Initialize dispute information - query ID, timestamp, value, etc.
         _thisDispute.queryId = _queryId;
         _thisDispute.timestamp = _timestamp;
-        _thisDispute.value = oracle.retrieveData(_queryId, _timestamp);
         _thisDispute.disputedReporter = oracle.getReporterByTimestamp(
             _queryId,
             _timestamp
