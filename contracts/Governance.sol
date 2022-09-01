@@ -312,19 +312,18 @@ contract Governance is UsingTellor {
             ((_thisVote.reporters.invalidQuery * 1e18) / _reportersVoteSum) +
             ((_thisVote.teamMultisig.invalidQuery * 1e18) / _multisigVoteSum) +
             ((_thisVote.users.invalidQuery * 1e18) / _usersVoteSum);
-        // If there are more invalid votes than for and against, result is invalid
-        if (
-            _scaledInvalid >= _scaledDoesSupport && _scaledInvalid >= _scaledAgainst
-        ) {
-            _thisVote.result = VoteResult.INVALID;
-        } else if (_scaledDoesSupport > _scaledAgainst) {
-            // If there are more support votes than against votes, allow the vote to pass
+
+        // If votes in support outweight the sum of against and invalid, result is passed
+        if (_scaledDoesSupport > _scaledAgainst + _scaledInvalid) {
             _thisVote.result = VoteResult.PASSED;
-        }
-        // If there are more against votes than support votes, the result failed
-        else {
+        // If votes in against outweight the sum of support and invalid, result is failed
+        } else if (_scaledAgainst > _scaledDoesSupport + _scaledInvalid) {
             _thisVote.result = VoteResult.FAILED;
+        // Otherwise, result is invalid
+        } else {
+            _thisVote.result = VoteResult.INVALID;
         }
+
         _thisVote.tallyDate = block.timestamp; // Update time vote was tallied
         emit VoteTallied(
             _disputeId,

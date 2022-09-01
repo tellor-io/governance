@@ -370,4 +370,69 @@ describe("Governance End-To-End Tests", function() {
     assert(disputeIds[0] == 2, "Dispute id should be correct")
     assert(disputeIds[1] == 4, "Dispute id should be correct")
   })
+
+  it("test vote weight outcomes", async function() {
+    // setup
+    await token.connect(accounts[1]).transfer(accounts[0].address, h.toWei("1000"))
+    await token.transfer(accounts[10].address, h.toWei("40"))
+    await token.transfer(accounts[1].address, h.toWei("1"))
+    await token.transfer(accounts[2].address, h.toWei("2"))
+    await token.transfer(accounts[3].address, h.toWei("3"))
+    await token.transfer(accounts[4].address, h.toWei("1"))
+    await token.approve(gov.address, h.toWei("40"))
+    await token.connect(accounts[10]).approve(flex.address, h.toWei("40"))
+    await flex.connect(accounts[10]).depositStake(h.toWei("40"))
+
+    // support > against + invalid
+    await flex.connect(accounts[10]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    blocky = await h.getBlock()
+    await gov.beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[3]).vote(1, true, false) // support - 3
+    await gov.connect(accounts[4]).vote(1, false, false) // against - 1
+    await gov.connect(accounts[1]).vote(1, false, true) // invalid - 1
+    await h.advanceTime(86400 * 2)
+    await gov.tallyVotes(1)
+    // get vote outcome
+    voteInfo = await gov.getVoteInfo(1)
+    assert(voteInfo[3] == 1, "Result should be support")
+
+    // against > support + invalid
+    await flex.connect(accounts[10]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    blocky = await h.getBlock()
+    await gov.beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[4]).vote(2, true, false) // support - 1
+    await gov.connect(accounts[3]).vote(2, false, true) // against - 3
+    await gov.connect(accounts[1]).vote(2, false, true) // invalid - 1
+    await h.advanceTime(86400 * 2)
+    await gov.tallyVotes(2)
+    // get vote outcome
+    voteInfo = await gov.getVoteInfo(3)
+    assert(voteInfo[3] == 0, "Result should be against")
+
+    // support <= against + invalid; against <= support + invalid; support > invalid; support > against
+    await flex.connect(accounts[10]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    blocky = await h.getBlock()
+    await gov.beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[2]).vote(3, true, false) // support - 2
+    await gov.connect(accounts[4]).vote(3, false, false) // against - 1
+    await gov.connect(accounts[1]).vote(3, false, true) // invalid - 1
+    await h.advanceTime(86400 * 2)
+    await gov.tallyVotes(3)
+    // get vote outcome
+    voteInfo = await gov.getVoteInfo(3)
+    assert(voteInfo[3] == 2, "Result should be invalid")
+
+    // support <= against + invalid; against <= support + invalid; against > invalid; against > support
+    await flex.connect(accounts[10]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    blocky = await h.getBlock()
+    await gov.beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[4]).vote(4, true, false) // support - 1
+    await gov.connect(accounts[2]).vote(4, false, true) // against - 2
+    await gov.connect(accounts[1]).vote(4, false, true) // invalid - 1
+    await h.advanceTime(86400 * 2)
+    await gov.tallyVotes(4)
+    // get vote outcome
+    voteInfo = await gov.getVoteInfo(4)
+    assert(voteInfo[3] == 2, "Result should be invalid")
+  })
 })
