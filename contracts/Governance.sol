@@ -114,9 +114,8 @@ contract Governance is UsingTellor {
             "no value exists at given timestamp"
         );
         bytes32 _hash = keccak256(abi.encodePacked(_queryId, _timestamp));
-        // Increment vote count and push new vote round
-        voteCount++;
-        uint256 _disputeId = voteCount;
+        // Push new vote round
+        uint256 _disputeId = voteCount + 1;
         uint256[] storage _voteRounds = voteRounds[_hash];
         _voteRounds.push(_disputeId);
 
@@ -162,6 +161,7 @@ contract Governance is UsingTellor {
             _thisDispute.value = disputeInfo[_voteRounds[0]].value;
         }
         _thisVote.fee = _disputeFee;
+        voteCount++;
         require(
             token.transferFrom(msg.sender, address(this), _disputeFee),
             "Fee must be paid"
