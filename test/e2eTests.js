@@ -5,13 +5,15 @@ const {
 const { ethers } = require("hardhat");
 const web3 = require('web3');
 const h = require("./helpers/helpers");
-const QUERYID1 = h.uintTob32(1)
 const abiCoder = new ethers.utils.AbiCoder
 const autopayQueryData = abiCoder.encode(["string", "bytes"], ["AutopayAddresses", abiCoder.encode(['bytes'], ['0x'])])
 const autopayQueryId = ethers.utils.keccak256(autopayQueryData)
 const TRB_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["trb", "usd"])
 const TRB_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", TRB_QUERY_DATA_ARGS])
 const TRB_QUERY_ID = ethers.utils.keccak256(TRB_QUERY_DATA)
+const ETH_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["eth", "usd"])
+const ETH_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", ETH_QUERY_DATA_ARGS])
+const ETH_QUERY_ID = ethers.utils.keccak256(ETH_QUERY_DATA)
 
 describe("Governance End-To-End Tests", function() {
 
@@ -48,27 +50,27 @@ describe("Governance End-To-End Tests", function() {
     let blocky = await h.getBlock()
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("10"))
     let balance1 = await token.balanceOf(accounts[2].address)
-    await h.expectThrow(gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)) //no value exists
-    await flex.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    await h.expectThrow(gov.connect(accounts[2]).beginDispute(ETH_QUERY_ID, blocky.timestamp)) //no value exists
+    await flex.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
     blocky = await h.getBlock()
     await flex.connect(accounts[4]).submitValue(h.hash('0x123456'), h.bytes(200), 0, '0x123456')
     let blocky2 = await h.getBlock()
     await flex.connect(accounts[5]).submitValue(h.hash('0x1234'), h.bytes("a"), 0, '0x1234')
     let blocky3 = await h.getBlock()
-    await h.expectThrow(gov.connect(accounts[4]).beginDispute(QUERYID1, blocky.timestamp)) // must have tokens to
+    await h.expectThrow(gov.connect(accounts[4]).beginDispute(ETH_QUERY_ID, blocky.timestamp)) // must have tokens to
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("30"))
-    await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp);
+    await gov.connect(accounts[2]).beginDispute(ETH_QUERY_ID, blocky.timestamp);
     await gov.connect(accounts[2]).beginDispute(h.hash('0x123456'), blocky2.timestamp);
     await gov.connect(accounts[2]).beginDispute(h.hash('0x1234'), blocky3.timestamp);
     assert(await gov.voteCount() == 3, "vote count should be 3")
     let balance2 = await token.balanceOf(accounts[2].address)
     let vars = await gov.getDisputeInfo(1)
-    let _hash = ethers.utils.solidityKeccak256(['bytes32', 'uint256'], [h.uintTob32(1), blocky.timestamp])
-    assert(vars[0] == QUERYID1, "queryID should be correct")
+    let _hash = ethers.utils.solidityKeccak256(['bytes32', 'uint256'], [ETH_QUERY_ID, blocky.timestamp])
+    assert(vars[0] == ETH_QUERY_ID, "queryID should be correct")
     assert(vars[1] == blocky.timestamp, "timestamp should be correct")
     assert(vars[2] == h.bytes(100), "value should be correct")
     assert(vars[3] == accounts[1].address, "accounts[1] should be correct")
-    assert(await gov.getOpenDisputesOnId(QUERYID1) == 1, "open disputes on ID should be correct")
+    assert(await gov.getOpenDisputesOnId(ETH_QUERY_ID) == 1, "open disputes on ID should be correct")
     assert(await gov.getVoteRounds(_hash) == 1, "number of vote rounds should be correct")
     vars = await gov.getDisputeInfo(2)
     _hash = await ethers.utils.solidityKeccak256(['bytes32', 'uint256'], [h.hash('0x123456'), blocky2.timestamp])
@@ -112,10 +114,10 @@ describe("Governance End-To-End Tests", function() {
     await token.connect(accounts[1]).approve(flex.address, web3.utils.toWei("10"))
     await flex.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
     await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("100"))
-    await flex.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    await flex.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
     blocky = await h.getBlock()
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("10"))
-    await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[2]).beginDispute(ETH_QUERY_ID, blocky.timestamp)
     await h.advanceTime(86400 * 2)
     await gov.tallyVotes(1)
     await h.advanceTime(86400)
@@ -133,25 +135,25 @@ describe("Governance End-To-End Tests", function() {
     await token.connect(accounts[1]).approve(flex.address, web3.utils.toWei("10"))
     await flex.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
     await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("100"))
-    await flex.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    await flex.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
     blocky = await h.getBlock()
     // Round 1
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("10"))
-    await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[2]).beginDispute(ETH_QUERY_ID, blocky.timestamp)
     await gov.connect(accounts[1]).vote(1, true, false)
     await gov.connect(accounts[2]).vote(1, true, false)
     await h.advanceTime(86400 * 2)
     await gov.tallyVotes(1)
     // Round 2
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("20"))
-    await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[2]).beginDispute(ETH_QUERY_ID, blocky.timestamp)
     await gov.connect(accounts[1]).vote(2, true, false)
     await gov.connect(accounts[2]).vote(2, true, false)
     await h.advanceTime(86400 * 4)
     await gov.tallyVotes(2)
     // Round 3
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("40"))
-    await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[2]).beginDispute(ETH_QUERY_ID, blocky.timestamp)
     await gov.connect(accounts[1]).vote(3, true, false)
     await gov.connect(accounts[2]).vote(3, true, false)
     await h.advanceTime(86400 * 6)
@@ -175,25 +177,25 @@ describe("Governance End-To-End Tests", function() {
     await token.connect(accounts[1]).approve(flex.address, web3.utils.toWei("10"))
     await flex.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
     await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("100"))
-    await flex.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    await flex.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
     blocky = await h.getBlock()
     // Round 1
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("1"))
-    await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[2]).beginDispute(ETH_QUERY_ID, blocky.timestamp)
     await gov.connect(accounts[1]).vote(1, true, false)
     await gov.connect(accounts[2]).vote(1, true, false)
     await h.advanceTime(86400 * 2)
     await gov.tallyVotes(1)
     // Round 2
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("2"))
-    await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[2]).beginDispute(ETH_QUERY_ID, blocky.timestamp)
     await gov.connect(accounts[1]).vote(2, true, false)
     await gov.connect(accounts[2]).vote(2, true, false)
     await h.advanceTime(86400 * 4)
     await gov.tallyVotes(2)
     // Round 3
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("4"))
-    await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[2]).beginDispute(ETH_QUERY_ID, blocky.timestamp)
     await gov.connect(accounts[1]).vote(3, false, false)
     await gov.connect(accounts[2]).vote(3, false, false)
     await h.advanceTime(86400 * 6)
@@ -231,11 +233,11 @@ describe("Governance End-To-End Tests", function() {
     // set user1
     await token.mint(user1.address, web3.utils.toWei("1"))
     await token.connect(user1).approve(autopay.address, web3.utils.toWei("1"))
-    await autopay.connect(user1).tip(QUERYID1, web3.utils.toWei("1"), '0x')
+    await autopay.connect(user1).tip(ETH_QUERY_ID, web3.utils.toWei("1"), ETH_QUERY_DATA)
     // // set user2
     await token.mint(user2.address, web3.utils.toWei("1"))
     await token.connect(user2).approve(autopay.address, web3.utils.toWei("1"))
-    await autopay.connect(user2).tip(QUERYID1, web3.utils.toWei("1"), '0x')
+    await autopay.connect(user2).tip(ETH_QUERY_ID, web3.utils.toWei("1"), ETH_QUERY_DATA)
     // set tokenholder2
     await token.connect(accounts[1]).transfer(tokenholder2.address, web3.utils.toWei("20"))
     // submit some reporter values
@@ -245,12 +247,12 @@ describe("Governance End-To-End Tests", function() {
     await token.connect(reporter2).approve(flex.address, web3.utils.toWei("10"))
     await flex.connect(reporter1).depositStake(web3.utils.toWei("10"))
     await flex.connect(reporter2).depositStake(web3.utils.toWei("10"))
-    await flex.connect(reporter1).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    await flex.connect(reporter1).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
     blocky = await h.getBlock()
     await flex.connect(reporter2).submitValue(h.hash('0xabcd'), h.bytes(100), 0, '0xabcd')
     // dispute value
     await token.connect(accounts[1]).approve(gov.address, web3.utils.toWei("10"))
-    await gov.connect(accounts[1]).beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[1]).beginDispute(ETH_QUERY_ID, blocky.timestamp)
     // vote
     await gov.connect(user1).vote(1, true, false)
     await gov.connect(user2).vote(1, false, false)
@@ -285,32 +287,32 @@ describe("Governance End-To-End Tests", function() {
     await flex.connect(accounts[1]).depositStake(web3.utils.toWei("10"))
     await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("100"))
     // there should be no previous value
-    await h.expectThrow(flex.getCurrentValue(QUERYID1))
+    await h.expectThrow(flex.getCurrentValue(ETH_QUERY_ID))
     // submit first value
-    await flex.connect(accounts[1]).submitValue(QUERYID1, h.bytes(200), 0, '0x')
+    await flex.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(200), 0, ETH_QUERY_DATA)
     blocky = await h.getBlock()
-    assert(await flex.getCurrentValue(QUERYID1) == h.bytes(200), "Current value should be most recent report")
+    assert(await flex.getCurrentValue(ETH_QUERY_ID) == h.bytes(200), "Current value should be most recent report")
     // bypass reporter lock
     h.advanceTime(43200)
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("10"))
     // 'Dispute must be started within reporting lock time'
-    await h.expectThrow(gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp))
-    await flex.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
-    assert(await flex.getCurrentValue(QUERYID1) == h.bytes(100), "Current value should be most recent report")
+    await h.expectThrow(gov.connect(accounts[2]).beginDispute(ETH_QUERY_ID, blocky.timestamp))
+    await flex.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
+    assert(await flex.getCurrentValue(ETH_QUERY_ID) == h.bytes(100), "Current value should be most recent report")
     blocky = await h.getBlock()
     await token.connect(accounts[2]).approve(gov.address, web3.utils.toWei("10"))
-    await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
-    assert(await flex.getCurrentValue(QUERYID1) == h.bytes(200), "Current value shouldn't be dispute value");
+    await gov.connect(accounts[2]).beginDispute(ETH_QUERY_ID, blocky.timestamp)
+    assert(await flex.getCurrentValue(ETH_QUERY_ID) == h.bytes(200), "Current value shouldn't be dispute value");
   })
   it("Cannot vote on dispute id 0", async function() {
     await h.expectThrow(gov.vote(0, true, false))
     await token.connect(accounts[1]).approve(flex.address, h.toWei("10"))
     await flex.connect(accounts[1]).depositStake(h.toWei("10"))
-    await flex.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    await flex.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
     blocky = await h.getBlock()
     await token.connect(accounts[1]).transfer(accounts[2].address, h.toWei("100"))
     await token.connect(accounts[2]).approve(gov.address, h.toWei("10"))
-    await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[2]).beginDispute(ETH_QUERY_ID, blocky.timestamp)
     await h.expectThrow(gov.connect(accounts[2]).vote(0, true, false))
     await gov.connect(accounts[2]).vote(1, true, false)
   })
@@ -318,16 +320,16 @@ describe("Governance End-To-End Tests", function() {
   it("On multiple vote rounds, disputed value gets recorded correctly", async function() {
     await token.connect(accounts[1]).approve(flex.address, h.toWei("10"))
     await flex.connect(accounts[1]).depositStake(h.toWei("10"))
-    await flex.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    await flex.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
     blocky = await h.getBlock()
     await token.connect(accounts[1]).transfer(accounts[2].address, h.toWei("100"))
     await token.connect(accounts[2]).approve(gov.address, h.toWei("100"))
-    await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[2]).beginDispute(ETH_QUERY_ID, blocky.timestamp)
     disputeInfo = await gov.getDisputeInfo(1)
     assert(disputeInfo[2] == h.bytes(100), "Disputed value should be correct")
     await h.advanceTime(86400 * 2)
     await gov.tallyVotes(1)
-    await gov.connect(accounts[2]).beginDispute(QUERYID1, blocky.timestamp)
+    await gov.connect(accounts[2]).beginDispute(ETH_QUERY_ID, blocky.timestamp)
     disputeInfo = await gov.getDisputeInfo(2)
     assert(disputeInfo[2] == h.bytes(100), "Disputed value should be correct")
   })
@@ -340,31 +342,31 @@ describe("Governance End-To-End Tests", function() {
     await token.connect(accounts[3]).approve(gov.address, h.toWei("50"))
     await flex.connect(accounts[1]).depositStake(h.toWei("20"))
     await flex.connect(accounts[2]).depositStake(h.toWei("20"))
-    await flex.connect(accounts[1]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    await flex.connect(accounts[1]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
     blocky1 = await h.getBlock()
-    await flex.connect(accounts[2]).submitValue(QUERYID1, h.bytes(200), 0, '0x')
+    await flex.connect(accounts[2]).submitValue(ETH_QUERY_ID, h.bytes(200), 0, ETH_QUERY_DATA)
     blocky2 = await h.getBlock()
-    await gov.connect(accounts[3]).beginDispute(QUERYID1, blocky1.timestamp)
+    await gov.connect(accounts[3]).beginDispute(ETH_QUERY_ID, blocky1.timestamp)
 
     disputeIds = await gov.getDisputesByReporter(accounts[1].address)
     assert(disputeIds.length == 1, "Should be one dispute id")
     assert(disputeIds[0] == 1, "Dispute id should be correct")
     disputeIds = await gov.getDisputesByReporter(accounts[2].address)
     assert(disputeIds.length == 0, "Should be zero dispute id")
-    await gov.connect(accounts[3]).beginDispute(QUERYID1, blocky2.timestamp)
+    await gov.connect(accounts[3]).beginDispute(ETH_QUERY_ID, blocky2.timestamp)
     disputeIds = await gov.getDisputesByReporter(accounts[2].address)
     assert(disputeIds.length == 1, "Should be one dispute id")
     assert(disputeIds[0] == 2, "Dispute id should be correct")
     await h.advanceTime(86400 * 2)
     await gov.tallyVotes(1)
-    await gov.connect(accounts[3]).beginDispute(QUERYID1, blocky1.timestamp)
+    await gov.connect(accounts[3]).beginDispute(ETH_QUERY_ID, blocky1.timestamp)
     disputeIds = await gov.getDisputesByReporter(accounts[1].address)
     assert(disputeIds.length == 2, "Should be two dispute ids")
     assert(disputeIds[0] == 1, "Dispute id should be correct")
     assert(disputeIds[1] == 3, "Dispute id should be correct")
-    await flex.connect(accounts[2]).submitValue(QUERYID1, h.uintTob32(300), 0, '0x')
+    await flex.connect(accounts[2]).submitValue(ETH_QUERY_ID, h.uintTob32(300), 0, ETH_QUERY_DATA)
     blocky3 = await h.getBlock()
-    await gov.connect(accounts[3]).beginDispute(QUERYID1, blocky3.timestamp)
+    await gov.connect(accounts[3]).beginDispute(ETH_QUERY_ID, blocky3.timestamp)
     disputeIds = await gov.getDisputesByReporter(accounts[2].address)
     assert(disputeIds.length == 2, "Should be 2 dispute ids")
     assert(disputeIds[0] == 2, "Dispute id should be correct")
@@ -384,9 +386,9 @@ describe("Governance End-To-End Tests", function() {
     await flex.connect(accounts[10]).depositStake(h.toWei("40"))
 
     // support > against + invalid
-    await flex.connect(accounts[10]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    await flex.connect(accounts[10]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
     blocky = await h.getBlock()
-    await gov.beginDispute(QUERYID1, blocky.timestamp)
+    await gov.beginDispute(ETH_QUERY_ID, blocky.timestamp)
     await gov.connect(accounts[3]).vote(1, true, false) // support - 3
     await gov.connect(accounts[4]).vote(1, false, false) // against - 1
     await gov.connect(accounts[1]).vote(1, false, true) // invalid - 1
@@ -397,9 +399,9 @@ describe("Governance End-To-End Tests", function() {
     assert(voteInfo[3] == 1, "Result should be support")
 
     // against > support + invalid
-    await flex.connect(accounts[10]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    await flex.connect(accounts[10]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
     blocky = await h.getBlock()
-    await gov.beginDispute(QUERYID1, blocky.timestamp)
+    await gov.beginDispute(ETH_QUERY_ID, blocky.timestamp)
     await gov.connect(accounts[4]).vote(2, true, false) // support - 1
     await gov.connect(accounts[3]).vote(2, false, true) // against - 3
     await gov.connect(accounts[1]).vote(2, false, true) // invalid - 1
@@ -410,9 +412,9 @@ describe("Governance End-To-End Tests", function() {
     assert(voteInfo[3] == 0, "Result should be against")
 
     // support <= against + invalid; against <= support + invalid; support > invalid; support > against
-    await flex.connect(accounts[10]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    await flex.connect(accounts[10]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
     blocky = await h.getBlock()
-    await gov.beginDispute(QUERYID1, blocky.timestamp)
+    await gov.beginDispute(ETH_QUERY_ID, blocky.timestamp)
     await gov.connect(accounts[2]).vote(3, true, false) // support - 2
     await gov.connect(accounts[4]).vote(3, false, false) // against - 1
     await gov.connect(accounts[1]).vote(3, false, true) // invalid - 1
@@ -423,9 +425,9 @@ describe("Governance End-To-End Tests", function() {
     assert(voteInfo[3] == 2, "Result should be invalid")
 
     // support <= against + invalid; against <= support + invalid; against > invalid; against > support
-    await flex.connect(accounts[10]).submitValue(QUERYID1, h.bytes(100), 0, '0x')
+    await flex.connect(accounts[10]).submitValue(ETH_QUERY_ID, h.bytes(100), 0, ETH_QUERY_DATA)
     blocky = await h.getBlock()
-    await gov.beginDispute(QUERYID1, blocky.timestamp)
+    await gov.beginDispute(ETH_QUERY_ID, blocky.timestamp)
     await gov.connect(accounts[4]).vote(4, true, false) // support - 1
     await gov.connect(accounts[2]).vote(4, false, true) // against - 2
     await gov.connect(accounts[1]).vote(4, false, true) // invalid - 1

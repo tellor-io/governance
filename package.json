@@ -33,6 +33,7 @@
     "dotenv": "^15.0.0",
     "hardhat-contract-sizer": "^2.4.0",
     "solidity-coverage": "^0.7.18",
+    "tellorflex": "github:tellor-io/tellorFlex#360",
     "usingtellor": "github:tellor-io/usingtellor#360audit",
     "web3": "^1.6.1"
   }
