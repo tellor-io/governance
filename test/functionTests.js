@@ -10,6 +10,7 @@ const TRB_QUERY_ID = ethers.utils.keccak256(TRB_QUERY_DATA)
 const ETH_QUERY_DATA_ARGS = abiCoder.encode(["string", "string"], ["eth", "usd"])
 const ETH_QUERY_DATA = abiCoder.encode(["string", "bytes"], ["SpotPrice", ETH_QUERY_DATA_ARGS])
 const ETH_QUERY_ID = ethers.utils.keccak256(ETH_QUERY_DATA)
+const MINIMUM_STAKE_AMOUNT = web3.utils.toWei("10")
 
 describe("Governance Function Tests", function() {
 
@@ -22,7 +23,7 @@ describe("Governance Function Tests", function() {
     await token.deployed();
     const Governance = await ethers.getContractFactory("Governance");
     const TellorFlex = await ethers.getContractFactory("TellorFlex")
-    flex = await TellorFlex.deploy(token.address, 86400/2, web3.utils.toWei("100"), web3.utils.toWei("10"),TRB_QUERY_ID)
+    flex = await TellorFlex.deploy(token.address, 86400/2, web3.utils.toWei("100"), web3.utils.toWei("10"), MINIMUM_STAKE_AMOUNT, TRB_QUERY_ID)
     await flex.deployed();
     gov = await Governance.deploy(flex.address, accounts[0].address);
     await gov.deployed();
