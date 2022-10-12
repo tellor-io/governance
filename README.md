@@ -6,7 +6,6 @@
 
 For more in-depth information about Tellor, checkout our [documenation](https://docs.tellor.io/tellor/), [whitepaper](https://docs.tellor.io/tellor/whitepaper/introduction) and [website](https://tellor.io/).
 
-
 ## Setting up and testing
 
 Install Dependencies
