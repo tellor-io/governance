@@ -14,9 +14,9 @@ const web3 = require('web3');
 
 var tellorAddress = '0x41b66dd93b03e89D29114a7613A6f9f0d4F40178'
 var teamMultisigAddress = '0x80fc34a2f9FfE86F41580F47368289C402DEc660'
-var dispute_fee = web3.utils.toWei("10")
 
-async function deployPolygonGovernance(_network, _pk, _nodeURL, tellorAdd, disputeFee, teamMultisigAdd) {
+
+async function deployPolygonGovernance(_network, _pk, _nodeURL, tellorAdd,  teamMultisigAdd) {
     console.log("deploy polygonGovernance")
     await run("compile")
 
@@ -34,7 +34,7 @@ async function deployPolygonGovernance(_network, _pk, _nodeURL, tellorAdd, dispu
     console.log("Starting deployment for PolygonGovernance contract...")
     const Governance = await ethers.getContractFactory("contracts/Governance.sol:Governance", wallet)
     const governancewithsigner = await Governance.connect(wallet)
-    const governance = await governancewithsigner.deploy(tellorAdd, disputeFee, teamMultisigAdd)
+    const governance = await governancewithsigner.deploy(tellorAdd,  teamMultisigAdd)
     await governance.deployed();
 
     if (net == "mainnet"){
@@ -67,6 +67,13 @@ async function deployPolygonGovernance(_network, _pk, _nodeURL, tellorAdd, dispu
     } else if (net == "xdai"){ //https://blockscout.com/poa/xdai/address/
       console.log("Governance contract deployed to:","https://blockscout.com/xdai/mainnet/address/"+ governance.address)
       console.log("    transaction hash:", "https://blockscout.com/xdai/mainnet/tx/" + governance.deployTransaction.hash);
+    } else if (net == "op_kovan"){ 
+        console.log("tellor contract deployed to:","https://kovan-optimistic.etherscan.io/address/"+ tellor.address)
+        console.log("    transaction hash:", "https://kovan-optimistic.etherscan.io/tx/" + tellor.deployTransaction.hash);
+    } else if (net == "ropsten"){
+        console.log("tellor contract deployed to:","https://ropsten.etherscan.io/address/"+ tellor.address)
+        console.log("    transaction hash:", "https://ropsten.etherscan.io/tx/" + tellor.deployTransaction.hash);   
+  
     } else {
         console.log("Please add network explorer details")
     }
@@ -82,7 +89,7 @@ async function deployPolygonGovernance(_network, _pk, _nodeURL, tellorAdd, dispu
     await run("verify:verify",
         {
             address: governance.address,
-            constructorArguments: [tellorAdd, disputeFee, teamMultisigAdd]
+            constructorArguments: [tellorAdd,  teamMultisigAdd]
         },
     )
 
@@ -91,14 +98,14 @@ async function deployPolygonGovernance(_network, _pk, _nodeURL, tellorAdd, dispu
 }
 
 
-// deployPolygonGovernance("polygon_testnet", process.env.TESTNET_PK, process.env.NODE_URL_MUMBAI, tellorAddress, dispute_fee, teamMultisigAddress)
+// deployPolygonGovernance("polygon_testnet", process.env.TESTNET_PK, process.env.NODE_URL_MUMBAI, tellorAddress, teamMultisigAddress)
 //     .then(() => process.exit(0))
 //     .catch(error => {
 //         console.error(error);
 //         process.exit(1);
 //     });
 
-deployPolygonGovernance("harmony_testnet", process.env.TESTNET_PK, process.env.NODE_URL_HARMONY_TESTNET, tellorAddress, dispute_fee, teamMultisigAddress)
+deployPolygonGovernance("harmony_testnet", process.env.TESTNET_PK, process.env.NODE_URL_HARMONY_TESTNET, tellorAddress,  teamMultisigAddress)
     .then(() => process.exit(0))
     .catch(error => {
         console.error(error);
