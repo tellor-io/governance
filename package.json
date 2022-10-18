@@ -34,7 +34,7 @@
     "hardhat-contract-sizer": "^2.4.0",
     "solidity-coverage": "^0.7.18",
     "tellorflex": "github:tellor-io/tellorFlex",
-    "usingtellor": "github:tellor-io/usingtellor",
+    "usingtellor": "^5.0.0",
     "web3": "^1.6.1"
   }
 }
