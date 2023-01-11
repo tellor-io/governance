@@ -160,6 +160,9 @@ contract Governance is UsingTellor {
             _thisDispute.slashedAmount = disputeInfo[_voteRounds[0]].slashedAmount;
             _thisDispute.value = disputeInfo[_voteRounds[0]].value;
         }
+        if (_disputeFee > oracle.getStakeAmount()) {
+          _disputeFee = oracle.getStakeAmount();
+        }
         _thisVote.fee = _disputeFee;
         voteCount++;
         require(
