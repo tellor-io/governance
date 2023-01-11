@@ -346,7 +346,7 @@ contract Governance is UsingTellor {
         uint256 _disputeId,
         bool _supports,
         bool _invalidQuery
-    ) external {
+    ) public {
         // Ensure that dispute has not been executed and that vote does not exist and is not tallied
         require(_disputeId <= voteCount && _disputeId > 0, "Vote does not exist");
         Vote storage _thisVote = voteInfo[_disputeId];
@@ -384,6 +384,18 @@ contract Governance is UsingTellor {
         }
         voteTallyByAddress[msg.sender]++;
         emit Voted(_disputeId, _supports, msg.sender, _invalidQuery);
+    }
+
+    /**
+     * @dev Enables the sender address to cast votes for multiple disputes
+     * @param _disputeIds is an array of vote IDs
+     * @param _supports is an array of the address's votes: whether or not they support or are against
+     * @param _invalidQuery is array of whether or not the dispute is valid
+     */
+    function voteOnMultipleDisputes(uint256[] memory _disputeIds, bool[] memory _supports, bool[] memory _invalidQuery) external {
+        for (uint256 _i = 0; _i < _disputeIds.length; _i++) {
+            vote(_disputeIds[_i], _supports[_i], _invalidQuery[_i]);
+        }
     }
 
     // *****************************************************************************

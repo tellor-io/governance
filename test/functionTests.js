@@ -202,6 +202,49 @@ describe("Governance Function Tests", function() {
     assert(await gov.getVoteTallyByAddress(accounts[1].address) == 1, "Vote tally by address should be correct")
     assert(await gov.getVoteTallyByAddress(accounts[2].address) == 1, "Vote tally by address should be correct")
   });
+  it("Test voteOnMultipleDisputes()", async function() {
+    reporter1 = accounts[9]
+    reporter2 = accounts[10]
+    reporter3 = accounts[11]
+    disputer = accounts[5]
+    voter = accounts[6]
+
+    await token.mint(reporter1.address, h.toWei("1000"))
+    await token.mint(reporter2.address, h.toWei("1000"))
+    await token.mint(reporter3.address, h.toWei("1000"))
+    await token.mint(disputer.address, h.toWei("100"))
+    await token.mint(voter.address, h.toWei("100"))
+
+    await token.connect(reporter1).approve(flex.address, h.toWei("1000"))
+    await token.connect(reporter2).approve(flex.address, h.toWei("1000"))
+    await token.connect(reporter3).approve(flex.address, h.toWei("1000"))
+    await token.connect(disputer).approve(gov.address, h.toWei("100"))
+
+    await flex.connect(reporter1).depositStake(h.toWei("1000"))
+    await flex.connect(reporter2).depositStake(h.toWei("1000"))
+    await flex.connect(reporter3).depositStake(h.toWei("1000"))
+
+    await flex.connect(reporter1).submitValue(ETH_QUERY_ID, h.bytes(101), 0, ETH_QUERY_DATA)
+    blocky1 = await h.getBlock()
+    await flex.connect(reporter2).submitValue(ETH_QUERY_ID, h.bytes(102), 0, ETH_QUERY_DATA)
+    blocky2 = await h.getBlock()
+    await flex.connect(reporter3).submitValue(ETH_QUERY_ID, h.bytes(103), 0, ETH_QUERY_DATA)
+    blocky3 = await h.getBlock()
+
+    await gov.connect(disputer).beginDispute(ETH_QUERY_ID, blocky1.timestamp)
+    await gov.connect(disputer).beginDispute(ETH_QUERY_ID, blocky2.timestamp)
+    await gov.connect(disputer).beginDispute(ETH_QUERY_ID, blocky3.timestamp)
+
+    await gov.connect(voter).voteOnMultipleDisputes([1, 2, 3], [true, false, false], [false, false, true])
+
+    voteInfo1 = await gov.getVoteInfo(1)
+    voteInfo2 = await gov.getVoteInfo(2)
+    voteInfo3 = await gov.getVoteInfo(3)
+
+    assert(voteInfo1[1][5] == h.toWei("100"), "Dispute1 Tokenholders doesSupport tally should be correct")
+    assert(voteInfo2[1][6] == h.toWei("100"), "Dispute2 Tokenholders against tally should be correct")
+    assert(voteInfo3[1][7] == h.toWei("100"), "Dispute3 Tokenholders invalid tally should be correct")
+  })
   it("Test didVote()", async function() {
     await token.connect(accounts[1]).transfer(accounts[2].address, web3.utils.toWei("20"))
     await token.connect(accounts[2]).approve(flex.address, web3.utils.toWei("20"))
