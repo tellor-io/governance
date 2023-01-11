@@ -392,7 +392,11 @@ contract Governance is UsingTellor {
      * @param _supports is an array of the address's votes: whether or not they support or are against
      * @param _invalidQuery is array of whether or not the dispute is valid
      */
-    function voteOnMultipleDisputes(uint256[] memory _disputeIds, bool[] memory _supports, bool[] memory _invalidQuery) external {
+    function voteOnMultipleDisputes(
+        uint256[] memory _disputeIds, 
+        bool[] memory _supports, 
+        bool[] memory _invalidQuery
+    ) external {
         for (uint256 _i = 0; _i < _disputeIds.length; _i++) {
             vote(_disputeIds[_i], _supports[_i], _invalidQuery[_i]);
         }
