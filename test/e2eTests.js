@@ -439,7 +439,7 @@ describe("Governance End-To-End Tests", function() {
     assert(voteInfo[3] == 2, "Result should be invalid")
   })
 
-  it("Dispute fee capped at stake amount", async function() {
+  it("Dispute fee capped at stake amount, one report", async function() {
     reporter1 = accounts[9]
     disputer = accounts[5]
     await token.mint(reporter1.address, h.toWei("1000"))
@@ -493,6 +493,88 @@ describe("Governance End-To-End Tests", function() {
     await gov.tallyVotes(5)
     await token.connect(disputer).approve(gov.address, h.toWei("10"))
     await gov.connect(disputer).beginDispute(ETH_QUERY_ID, blocky.timestamp)
+    assert(await token.balanceOf(disputer.address) == h.toWei("65"), "Disputer should have correct balance")
+    voteInfo = await gov.getVoteInfo(6)
+    assert(voteInfo[1][3] == h.toWei("10"), "Dispute fee should be correct")
+  })
+
+  it("Dispute fee capped at stake amount, many reports", async function() {
+    reporter1 = accounts[9]
+    reporter2 = accounts[10]
+    reporter3 = accounts[11]
+    reporter4 = accounts[12]
+    reporter5 = accounts[13]
+    reporter6 = accounts[14]
+    disputer = accounts[5]
+    await token.mint(reporter1.address, h.toWei("1000"))
+    await token.mint(reporter2.address, h.toWei("1000"))
+    await token.mint(reporter3.address, h.toWei("1000"))
+    await token.mint(reporter4.address, h.toWei("1000"))
+    await token.mint(reporter5.address, h.toWei("1000"))
+    await token.mint(reporter6.address, h.toWei("1000"))
+    await token.mint(disputer.address, h.toWei("100"))
+
+    await token.connect(reporter1).approve(flex.address, h.toWei("1000"))
+    await token.connect(reporter2).approve(flex.address, h.toWei("1000"))
+    await token.connect(reporter3).approve(flex.address, h.toWei("1000"))
+    await token.connect(reporter4).approve(flex.address, h.toWei("1000"))
+    await token.connect(reporter5).approve(flex.address, h.toWei("1000"))
+    await token.connect(reporter6).approve(flex.address, h.toWei("1000"))
+
+    await flex.connect(reporter1).depositStake(h.toWei("1000"))
+    await flex.connect(reporter2).depositStake(h.toWei("1000"))
+    await flex.connect(reporter3).depositStake(h.toWei("1000"))
+    await flex.connect(reporter4).depositStake(h.toWei("1000"))
+    await flex.connect(reporter5).depositStake(h.toWei("1000"))
+    await flex.connect(reporter6).depositStake(h.toWei("1000"))
+
+    await flex.connect(reporter1).submitValue(ETH_QUERY_ID, h.bytes(101), 0, ETH_QUERY_DATA)
+    blocky1 = await h.getBlock()
+    await flex.connect(reporter2).submitValue(ETH_QUERY_ID, h.bytes(102), 0, ETH_QUERY_DATA)
+    blocky2 = await h.getBlock()
+    await flex.connect(reporter3).submitValue(ETH_QUERY_ID, h.bytes(103), 0, ETH_QUERY_DATA)
+    blocky3 = await h.getBlock()
+    await flex.connect(reporter4).submitValue(ETH_QUERY_ID, h.bytes(104), 0, ETH_QUERY_DATA)
+    blocky4 = await h.getBlock()
+    await flex.connect(reporter5).submitValue(ETH_QUERY_ID, h.bytes(105), 0, ETH_QUERY_DATA)
+    blocky5 = await h.getBlock()
+    await flex.connect(reporter6).submitValue(ETH_QUERY_ID, h.bytes(106), 0, ETH_QUERY_DATA)
+    blocky6 = await h.getBlock()
+
+    assert(await flex.getStakeAmount() == h.toWei("10"), "Stake amount should be correct")
+    assert(await token.balanceOf(disputer.address) == h.toWei("100"), "Disputer should have correct balance")
+    await token.connect(disputer).approve(gov.address, h.toWei("1"))
+    await gov.connect(disputer).beginDispute(ETH_QUERY_ID, blocky1.timestamp)
+    assert(await token.balanceOf(disputer.address) == h.toWei("99"), "Disputer should have correct balance")
+    voteInfo = await gov.getVoteInfo(1)
+    assert(voteInfo[1][3] == h.toWei("1"), "Dispute fee should be correct")
+
+    await token.connect(disputer).approve(gov.address, h.toWei("2"))
+    await gov.connect(disputer).beginDispute(ETH_QUERY_ID, blocky2.timestamp)
+    assert(await token.balanceOf(disputer.address) == h.toWei("97"), "Disputer should have correct balance")
+    voteInfo = await gov.getVoteInfo(2)
+    assert(voteInfo[1][3] == h.toWei("2"), "Dispute fee should be correct")
+
+    await token.connect(disputer).approve(gov.address, h.toWei("4"))
+    await gov.connect(disputer).beginDispute(ETH_QUERY_ID, blocky3.timestamp)
+    assert(await token.balanceOf(disputer.address) == h.toWei("93"), "Disputer should have correct balance")
+    voteInfo = await gov.getVoteInfo(3)
+    assert(voteInfo[1][3] == h.toWei("4"), "Dispute fee should be correct")
+
+    await token.connect(disputer).approve(gov.address, h.toWei("8"))
+    await gov.connect(disputer).beginDispute(ETH_QUERY_ID, blocky4.timestamp)
+    assert(await token.balanceOf(disputer.address) == h.toWei("85"), "Disputer should have correct balance")
+    voteInfo = await gov.getVoteInfo(4)
+    assert(voteInfo[1][3] == h.toWei("8"), "Dispute fee should be correct")
+
+    await token.connect(disputer).approve(gov.address, h.toWei("10"))
+    await gov.connect(disputer).beginDispute(ETH_QUERY_ID, blocky5.timestamp)
+    assert(await token.balanceOf(disputer.address) == h.toWei("75"), "Disputer should have correct balance")
+    voteInfo = await gov.getVoteInfo(5)
+    assert(voteInfo[1][3] == h.toWei("10"), "Dispute fee should be correct")
+
+    await token.connect(disputer).approve(gov.address, h.toWei("10"))
+    await gov.connect(disputer).beginDispute(ETH_QUERY_ID, blocky6.timestamp)
     assert(await token.balanceOf(disputer.address) == h.toWei("65"), "Disputer should have correct balance")
     voteInfo = await gov.getVoteInfo(6)
     assert(voteInfo[1][3] == h.toWei("10"), "Dispute fee should be correct")
