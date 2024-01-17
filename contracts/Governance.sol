@@ -93,9 +93,10 @@ contract Governance is UsingTellor {
      * @param _teamMultisig address of tellor team multisig, one of four voting
      * stakeholder groups
      */
-    constructor(address payable _tellor, address _teamMultisig)
-        UsingTellor(_tellor)
-    {
+    constructor(
+        address payable _tellor,
+        address _teamMultisig
+    ) UsingTellor(_tellor) {
         oracle = IOracle(_tellor);
         token = IERC20(oracle.getTokenAddress());
         oracleAddress = _tellor;
@@ -109,10 +110,8 @@ contract Governance is UsingTellor {
      */
     function beginDispute(bytes32 _queryId, uint256 _timestamp) external {
         // Ensure value actually exists
-        require(
-            oracle.getBlockNumberByTimestamp(_queryId, _timestamp) != 0,
-            "no value exists at given timestamp"
-        );
+        address _reporter = oracle.getReporterByTimestamp(_queryId, _timestamp);
+        require(_reporter != address(0), "no value exists at given timestamp");
         bytes32 _hash = keccak256(abi.encodePacked(_queryId, _timestamp));
         // Push new vote round
         uint256 _disputeId = voteCount + 1;
@@ -126,17 +125,14 @@ contract Governance is UsingTellor {
         // Initialize dispute information - query ID, timestamp, value, etc.
         _thisDispute.queryId = _queryId;
         _thisDispute.timestamp = _timestamp;
-        _thisDispute.disputedReporter = oracle.getReporterByTimestamp(
-            _queryId,
-            _timestamp
-        );
+        _thisDispute.disputedReporter = _reporter;
         // Initialize vote information - hash, initiator, block number, etc.
         _thisVote.identifierHash = _hash;
         _thisVote.initiator = msg.sender;
         _thisVote.blockNumber = block.number;
         _thisVote.startDate = block.timestamp;
         _thisVote.voteRound = _voteRounds.length;
-        disputeIdsByReporter[_thisDispute.disputedReporter].push(_disputeId);
+        disputeIdsByReporter[_reporter].push(_disputeId);
         uint256 _disputeFee = getDisputeFee();
         if (_voteRounds.length == 1) {
             require(
@@ -145,9 +141,18 @@ contract Governance is UsingTellor {
             );
             openDisputesOnId[_queryId]++;
             // calculate dispute fee based on number of open disputes on query ID
-            _disputeFee = _disputeFee * 2**(openDisputesOnId[_queryId] - 1);
+            if (openDisputesOnId[_queryId] > 4) {
+                _disputeFee = oracle.getStakeAmount();
+            } else {
+                _disputeFee =
+                    _disputeFee *
+                    2 ** (openDisputesOnId[_queryId] - 1);
+            }
             // slash a single stakeAmount from reporter
-            _thisDispute.slashedAmount = oracle.slashReporter(_thisDispute.disputedReporter, address(this));
+            _thisDispute.slashedAmount = oracle.slashReporter(
+                _reporter,
+                address(this)
+            );
             _thisDispute.value = oracle.retrieveData(_queryId, _timestamp);
             oracle.removeValue(_queryId, _timestamp);
         } else {
@@ -156,12 +161,14 @@ contract Governance is UsingTellor {
                 block.timestamp - voteInfo[_prevId].tallyDate < 1 days,
                 "New dispute round must be started within a day"
             );
-            _disputeFee = _disputeFee * 2**(_voteRounds.length - 1);
-            _thisDispute.slashedAmount = disputeInfo[_voteRounds[0]].slashedAmount;
+            if (_voteRounds.length > 4) {
+                _disputeFee = oracle.getStakeAmount();
+            } else {
+                _disputeFee = _disputeFee * 2 ** (_voteRounds.length - 1);
+            }
+            _thisDispute.slashedAmount = disputeInfo[_voteRounds[0]]
+                .slashedAmount;
             _thisDispute.value = disputeInfo[_voteRounds[0]].value;
-        }
-        if (_disputeFee > oracle.getStakeAmount()) {
-          _disputeFee = oracle.getStakeAmount();
         }
         _thisVote.fee = _disputeFee;
         voteCount++;
@@ -169,12 +176,7 @@ contract Governance is UsingTellor {
             token.transferFrom(msg.sender, address(this), _disputeFee),
             "Fee must be paid"
         ); // This is the dispute fee. Returned if dispute passes
-        emit NewDispute(
-            _disputeId,
-            _queryId,
-            _timestamp,
-            _thisDispute.disputedReporter
-        );
+        emit NewDispute(_disputeId, _queryId, _timestamp, _reporter);
     }
 
     /**
@@ -184,7 +186,10 @@ contract Governance is UsingTellor {
     function executeVote(uint256 _disputeId) external {
         // Ensure validity of vote ID, vote has been executed, and vote must be tallied
         Vote storage _thisVote = voteInfo[_disputeId];
-        require(_disputeId <= voteCount && _disputeId > 0, "Dispute ID must be valid");
+        require(
+            _disputeId <= voteCount && _disputeId > 0,
+            "Dispute ID must be valid"
+        );
         require(!_thisVote.executed, "Vote has already been executed");
         require(_thisVote.tallyDate > 0, "Vote must be tallied");
         // Ensure vote must be final vote and that time has to be pass (86400 = 24 * 60 * 60 for seconds in a day)
@@ -262,7 +267,10 @@ contract Governance is UsingTellor {
         // Ensure vote has not been executed and that vote has not been tallied
         Vote storage _thisVote = voteInfo[_disputeId];
         require(_thisVote.tallyDate == 0, "Vote has already been tallied");
-        require(_disputeId <= voteCount && _disputeId > 0, "Vote does not exist");
+        require(
+            _disputeId <= voteCount && _disputeId > 0,
+            "Vote does not exist"
+        );
         // Determine appropriate vote duration dispute round
         // Vote time increases as rounds increase but only up to 6 days (withdrawal period)
         require(
@@ -319,10 +327,10 @@ contract Governance is UsingTellor {
         // If votes in support outweight the sum of against and invalid, result is passed
         if (_scaledDoesSupport > _scaledAgainst + _scaledInvalid) {
             _thisVote.result = VoteResult.PASSED;
-        // If votes in against outweight the sum of support and invalid, result is failed
+            // If votes in against outweight the sum of support and invalid, result is failed
         } else if (_scaledAgainst > _scaledDoesSupport + _scaledInvalid) {
             _thisVote.result = VoteResult.FAILED;
-        // Otherwise, result is invalid
+            // Otherwise, result is invalid
         } else {
             _thisVote.result = VoteResult.INVALID;
         }
@@ -348,14 +356,18 @@ contract Governance is UsingTellor {
         bool _invalidQuery
     ) public {
         // Ensure that dispute has not been executed and that vote does not exist and is not tallied
-        require(_disputeId <= voteCount && _disputeId > 0, "Vote does not exist");
+        require(
+            _disputeId <= voteCount && _disputeId > 0,
+            "Vote does not exist"
+        );
         Vote storage _thisVote = voteInfo[_disputeId];
         require(_thisVote.tallyDate == 0, "Vote has already been tallied");
         require(!_thisVote.voted[msg.sender], "Sender has already voted");
         // Update voting status and increment total queries for support, invalid, or against based on vote
         _thisVote.voted[msg.sender] = true;
         uint256 _tokenBalance = token.balanceOf(msg.sender);
-        (, uint256 _stakedBalance, uint256 _lockedBalance, , , , , ) = oracle.getStakerInfo(msg.sender);
+        (, uint256 _stakedBalance, uint256 _lockedBalance, , , , , ) = oracle
+            .getStakerInfo(msg.sender);
         _tokenBalance += _stakedBalance + _lockedBalance;
         if (_invalidQuery) {
             _thisVote.tokenholders.invalidQuery += _tokenBalance;
@@ -367,7 +379,8 @@ contract Governance is UsingTellor {
             }
         } else if (_supports) {
             _thisVote.tokenholders.doesSupport += _tokenBalance;
-            _thisVote.reporters.doesSupport += oracle.getReportsSubmittedByAddress(msg.sender);
+            _thisVote.reporters.doesSupport += oracle
+                .getReportsSubmittedByAddress(msg.sender);
             _thisVote.users.doesSupport += _getUserTips(msg.sender);
             if (msg.sender == teamMultisig) {
                 _thisVote.teamMultisig.doesSupport += 1;
@@ -393,8 +406,8 @@ contract Governance is UsingTellor {
      * @param _invalidQuery is array of whether or not the dispute is valid
      */
     function voteOnMultipleDisputes(
-        uint256[] memory _disputeIds, 
-        bool[] memory _supports, 
+        uint256[] memory _disputeIds,
+        bool[] memory _supports,
         bool[] memory _invalidQuery
     ) external {
         for (uint256 _i = 0; _i < _disputeIds.length; _i++) {
@@ -414,11 +427,10 @@ contract Governance is UsingTellor {
      * @param _voter is the address of the voter to check for
      * @return bool of whether or note the address voted for the specific vote
      */
-    function didVote(uint256 _disputeId, address _voter)
-        external
-        view
-        returns (bool)
-    {
+    function didVote(
+        uint256 _disputeId,
+        address _voter
+    ) external view returns (bool) {
         return voteInfo[_disputeId].voted[_voter];
     }
 
@@ -429,8 +441,9 @@ contract Governance is UsingTellor {
         return (oracle.getStakeAmount() / 10);
     }
 
-
-    function getDisputesByReporter(address _reporter) external view returns (uint256[] memory) {
+    function getDisputesByReporter(
+        address _reporter
+    ) external view returns (uint256[] memory) {
         return disputeIdsByReporter[_reporter];
     }
 
@@ -442,16 +455,9 @@ contract Governance is UsingTellor {
      * @return bytes memory of the value being disputed
      * @return address of the reporter being disputed
      */
-    function getDisputeInfo(uint256 _disputeId)
-        external
-        view
-        returns (
-            bytes32,
-            uint256,
-            bytes memory,
-            address
-        )
-    {
+    function getDisputeInfo(
+        uint256 _disputeId
+    ) external view returns (bytes32, uint256, bytes memory, address) {
         Dispute storage _d = disputeInfo[_disputeId];
         return (_d.queryId, _d.timestamp, _d.value, _d.disputedReporter);
     }
@@ -461,11 +467,9 @@ contract Governance is UsingTellor {
      * @param _queryId is the ID of a specific data feed
      * @return uint256 of the number of open disputes for the query ID
      */
-    function getOpenDisputesOnId(bytes32 _queryId)
-        external
-        view
-        returns (uint256)
-    {
+    function getOpenDisputesOnId(
+        bytes32 _queryId
+    ) external view returns (uint256) {
         return openDisputesOnId[_queryId];
     }
 
@@ -486,16 +490,12 @@ contract Governance is UsingTellor {
      * @return VoteResult result of the vote
      * @return address memory of the vote initiator
      */
-    function getVoteInfo(uint256 _disputeId)
+    function getVoteInfo(
+        uint256 _disputeId
+    )
         external
         view
-        returns (
-            bytes32,
-            uint256[17] memory,
-            bool,
-            VoteResult,
-            address
-        )
+        returns (bytes32, uint256[17] memory, bool, VoteResult, address)
     {
         Vote storage _v = voteInfo[_disputeId];
         return (
@@ -530,11 +530,9 @@ contract Governance is UsingTellor {
      * @param _hash is the identifier hash for a vote
      * @return uint256[] memory dispute IDs of the vote rounds
      */
-    function getVoteRounds(bytes32 _hash)
-        external
-        view
-        returns (uint256[] memory)
-    {
+    function getVoteRounds(
+        bytes32 _hash
+    ) external view returns (uint256[] memory) {
         return voteRounds[_hash];
     }
 
@@ -543,11 +541,9 @@ contract Governance is UsingTellor {
      * @param _voter is the address of the voter to check for
      * @return uint256 of the total number of votes cast by the voter
      */
-    function getVoteTallyByAddress(address _voter)
-        external
-        view
-        returns (uint256)
-    {
+    function getVoteTallyByAddress(
+        address _voter
+    ) external view returns (uint256) {
         return voteTallyByAddress[_voter];
     }
 
@@ -557,7 +553,9 @@ contract Governance is UsingTellor {
      * @param _user address of the user to check the tip count for
      * @return _userTipTally uint256 of total tips contributed to autopay by the address
      */
-    function _getUserTips(address _user) internal returns (uint256 _userTipTally) {
+    function _getUserTips(
+        address _user
+    ) internal returns (uint256 _userTipTally) {
         // get autopay addresses array from oracle
         (bytes memory _autopayAddrsBytes, uint256 _timestamp) = getDataBefore(
             autopayAddrsQueryId,
