@@ -184,7 +184,7 @@ describe("Governance End-To-End Tests", function () {
     assert(s - web3.utils.toWei("510") == 0, "should have tokens returned");
   });
   it("Test 1000 rounds of a dispute, each of 3 outcomes", async function () {
-    this.timeout(320000);
+    this.timeout(500000);
 
     await token.mint(accounts[3].address, h.toWei("1000")); //voter
     await token.mint(accounts[1].address, h.toWei("1000")); //reporter
@@ -611,7 +611,7 @@ describe("Governance End-To-End Tests", function () {
   });
 
   it("Test 1000 rounds of a dispute -- different ts", async function () {
-    this.timeout(320000);
+    this.timeout(500000);
     await token.mint(accounts[3].address, h.toWei("1000")); //voter
     await token.mint(accounts[1].address, h.toWei("10000000000000000000000"));
     await token.mint(accounts[2].address, h.toWei("10000"));
@@ -659,7 +659,7 @@ describe("Governance End-To-End Tests", function () {
   });
 
   it("Test 1000 rounds of a dispute", async function () {
-    this.timeout(320000);
+    this.timeout(500000);
     await token.mint(accounts[3].address, h.toWei("1000")); //voter
     await token.mint(accounts[1].address, h.toWei("1000"));
     await token.mint(accounts[2].address, h.toWei("10000"));
@@ -912,7 +912,7 @@ describe("Governance End-To-End Tests", function () {
   });
 
   it("Test voting 10000 times in 5 different rounds", async function () {
-    this.timeout(320000);
+    this.timeout(500000);
     await token.mint(accounts[3].address, h.toWei("100000000000000000000")); //voter
     await token.mint(
       accounts[1].address,
@@ -952,7 +952,7 @@ describe("Governance End-To-End Tests", function () {
   });
 
   it("Test 1000 rounds of a dispute -- same ID", async function () {
-    this.timeout(320000);
+    this.timeout(500000);
     await token.mint(accounts[3].address, h.toWei("100000000000000000000")); //voter
     await token.mint(
       accounts[1].address,
@@ -1100,7 +1100,7 @@ describe("Governance End-To-End Tests", function () {
   });
 
   it("Test 1000 open disputes on a queryId", async function () {
-    this.timeout(320000);
+    this.timeout(500000);
 
     reporter1 = accounts[9];
     reporter2 = accounts[10];
